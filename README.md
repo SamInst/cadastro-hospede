@@ -27,37 +27,6 @@
 
 ---
 
-## 🚀 Como rodar localmente
-
-```bash
-# Clone o repositório
-git clone https://github.com/SamInst/cadastro-hospede.git
-
-# Entre na pasta
-cd cadastro-hospede
-
-# Instale as dependências
-npm install
-
-# Inicie o servidor de desenvolvimento
-npm run dev
-```
-
-Acesse em: [http://localhost:5173](http://localhost:5173)
-
----
-
-## 🔗 Integração com a API
-
-Por padrão o projeto aponta para `localhost:8080`. Para usar em produção, altere a constante em `src/pages/registro/ClienteRegistroPage.jsx`:
-
-```js
-// Linha ~29
-const BASE_URL = BASE_URL_PROD; // trocar de BASE_URL_LOCAL
-```
-
----
-
 ## 📁 Estrutura do projeto
 
 ```
