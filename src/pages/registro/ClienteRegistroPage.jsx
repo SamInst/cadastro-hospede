@@ -20,7 +20,6 @@ import {
 
 import { DatePicker }  from '../../components/ui/DatePicker';
 import styles          from './ClienteRegistroPage.module.css';
-import logoPousada     from '../../assets/logo-pousada.png';
 
 // ── URLs ─────────────────────────────────────────────────────────────────────
 const BASE_URL_LOCAL = 'http://localhost:8080';
@@ -363,14 +362,14 @@ export default function ClienteRegistroPage() {
   // ── CPF icon ─────────────────────────────────────────────────────────────────
   const cpfIcon = cpfStatus === 'loading' ? <Loader2 size={15} className={styles.spin} />
     : cpfStatus === 'ok'      ? <CheckCircle2 size={15} className={styles.iconOk}   />
-    : cpfStatus === 'exists'  ? <AlertTriangle size={15} className={styles.iconInfo} />
+    : cpfStatus === 'exists'  ? <AlertTriangle size={15} className={styles.iconErr} />
     : cpfStatus === 'invalid' ? <XCircle size={15} className={styles.iconErr} />
     : null;
 
   const cpfCls = [
     styles.input,
     cpfStatus === 'ok'      ? styles.inputOk   : '',
-    cpfStatus === 'exists'  ? styles.inputInfo  : '',
+    cpfStatus === 'exists'  ? styles.inputErr   : '',
     cpfStatus === 'invalid' ? styles.inputErr  : '',
     showErrors && !form.cpf ? styles.inputErr  : '',
   ].filter(Boolean).join(' ');
@@ -442,7 +441,7 @@ export default function ClienteRegistroPage() {
                       {cpfIcon && <span className={styles.inputSuffix}>{cpfIcon}</span>}
                     </div>
                     {cpfStatus === 'invalid' && <span className={styles.fieldMsg} style={{ color:'#c0392b' }}>CPF inválido</span>}
-                    {cpfStatus === 'exists'  && <span className={styles.fieldMsg} style={{ color:'#b07a1a' }}>CPF já cadastrado</span>}
+                    {cpfStatus === 'exists'  && <span className={styles.fieldMsg} style={{ color:'#c0392b' }}>CPF já cadastrado</span>}
                     {cpfStatus === 'ok'      && <span className={styles.fieldMsg} style={{ color:'#27855a' }}>CPF disponível</span>}
                   </div>
                   <div className={styles.field}>
@@ -705,8 +704,7 @@ export default function ClienteRegistroPage() {
         </div>{/* /card */}
 
         <div className={styles.brandCard}>
-          <img src={logoPousada} alt="Isto É Pousada" className={styles.logo} />
-          <div className={styles.brandInfo}>
+<div className={styles.brandInfo}>
             <span className={styles.brandName}>Isto É Pousada</span>
             <span className={styles.brandSub}>Referência na Baixada Maranhense</span>
             <a
