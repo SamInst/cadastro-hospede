@@ -283,7 +283,8 @@ export default function ClienteRegistroPage() {
 
   // ── Validação step 1 ────────────────────────────────────────────────────────
   const required1 = { cpf: form.cpf, nome: form.nome, dataNascimento: form.dataNascimento,
-                      telefone: form.telefone, email: form.email, cep: form.cep };
+                      telefone: form.telefone, cep: form.cep,
+                      sexo: form.sexo, rg: form.rg, profissao: form.profissao, endereco: form.endereco };
   const missingField = f => !required1[f];
   const step1Valid = Object.values(required1).every(v => !!v) && cpfStatus !== 'invalid';
 
@@ -470,14 +471,14 @@ export default function ClienteRegistroPage() {
                       onChange={e => set('telefone', maskPhone(e.target.value))} placeholder="(00) 00000-0000" />
                   </div>
                   <div className={styles.field}>
-                    <label className={styles.label}>Sexo</label>
+                    <label className={[lblErr('sexo'), styles.req].join(' ')}>Sexo</label>
                     <select className={styles.input} value={form.sexo} onChange={e => set('sexo', e.target.value)}>
                       {SEXO_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </select>
                   </div>
                   <div className={styles.field}>
-                    <label className={styles.label}>RG</label>
-                    <input className={styles.input} value={form.rg}
+                    <label className={[lblErr('rg'), styles.req].join(' ')}>RG</label>
+                    <input className={errCls('rg')} value={form.rg}
                       onChange={e => set('rg', e.target.value)} placeholder="RG" />
                   </div>
                 </div>
@@ -485,13 +486,13 @@ export default function ClienteRegistroPage() {
                 {/* Email + Profissão */}
                 <div className={styles.grid2} style={{ marginBottom: 16 }}>
                   <div className={styles.field}>
-                    <label className={[lblErr('email'), styles.req].join(' ')}>Email</label>
+                    <label className={styles.label}>Email</label>
                     <input className={errCls('email')} type="email" value={form.email}
                       onChange={e => set('email', e.target.value)} placeholder="email@exemplo.com" />
                   </div>
                   <div className={styles.field}>
-                    <label className={styles.label}>Profissão</label>
-                    <input className={styles.input} value={form.profissao}
+                    <label className={[lblErr('profissao'), styles.req].join(' ')}>Profissão</label>
+                    <input className={errCls('profissao')} value={form.profissao}
                       onChange={e => set('profissao', e.target.value)} placeholder="Ex: Engenheiro" />
                   </div>
                 </div>
@@ -534,8 +535,8 @@ export default function ClienteRegistroPage() {
                 {/* Endereço + Número */}
                 <div className={styles.grid3} style={{ marginBottom: 16 }}>
                   <div className={[styles.field, styles.span2].join(' ')}>
-                    <label className={styles.label}>Endereço</label>
-                    <input className={styles.input} value={form.endereco}
+                    <label className={[lblErr('endereco'), styles.req].join(' ')}>Endereço</label>
+                    <input className={errCls('endereco')} value={form.endereco}
                       onChange={e => set('endereco', e.target.value)} placeholder="Rua / Av." />
                   </div>
                   <div className={styles.field}>
