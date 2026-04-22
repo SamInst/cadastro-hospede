@@ -395,7 +395,8 @@ export default function ClienteRegistroPage() {
         <header className={styles.header}>
           <div className={styles.headerLine} />
           <h1 className={styles.title}>Cadastro de Hóspede</h1>
-          <p className={styles.subtitle}>Preencha seus dados para completar o cadastro</p>
+          <p className={styles.subtitle}>Seus dados são utilizados conforme a LGPD (Lei nº 13.709/2018).</p>
+          <p className={styles.subtitle}>Preencha seus dados para concluir seu checkin</p>
         </header>
 
         <div className={styles.card}>
