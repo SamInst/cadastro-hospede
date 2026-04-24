@@ -218,6 +218,10 @@
   -webkit-appearance: none;
   box-sizing: border-box;
 }
+.input:not(select):not([type="email"]),
+.comboInput {
+  text-transform: uppercase;
+}
 .input:focus,
 .comboInput:focus { border-color: #b8955a; box-shadow: 0 0 0 3px rgba(184,149,90,.14); }
 

@@ -29,17 +29,27 @@ const BASE_URL_PROD  = 'https://saas-hotel-istoepousada-dc98593a88fc.herokuapp.c
 const BASE_URL = BASE_URL_PROD;
 
 // ── Listas ────────────────────────────────────────────────────────────────────
-const MARCAS_VEICULO = [
-  'Fiat','Volkswagen','Chevrolet','Toyota','Hyundai','Honda','Jeep','Renault','Nissan','Ford',
-  'Peugeot','Citroën','BMW','Mercedes-Benz','Audi','Kia','Volvo','Subaru','Mazda','Mitsubishi',
-  'Suzuki','Land Rover','Jaguar','Porsche','Tesla','BYD','Chery','Troller','Alfa Romeo','Dodge',
+const TIPOS_VEICULO = [
+  'Carro','Moto','Pickup','SUV','Van','Caminhão','Ônibus','Microônibus','Quadriciclo','Trator',
 ];
+
+const MARCAS_POR_TIPO = {
+  'Carro':       ['Fiat','Volkswagen','Chevrolet','Toyota','Hyundai','Honda','Jeep','Renault','Nissan','Ford','Peugeot','Citroën','BMW','Mercedes-Benz','Audi','Kia','Volvo','Subaru','Mazda','Mitsubishi','Suzuki','Land Rover','Jaguar','Porsche','Tesla','BYD','Chery','Troller','Alfa Romeo','Dodge'],
+  'Moto':        ['Honda','Yamaha','Suzuki','Kawasaki','BMW','Ducati','Harley-Davidson','Royal Enfield','Triumph','KTM','Dafra','Shineray','Haojue','Kasinski','Hero'],
+  'Pickup':      ['Fiat','Chevrolet','Ford','Toyota','Volkswagen','Renault','Nissan','Mitsubishi','Dodge','Ram','Mercedes-Benz'],
+  'SUV':         ['Toyota','Hyundai','Jeep','Honda','Kia','BMW','Mercedes-Benz','Audi','Volvo','Land Rover','Ford','Chevrolet','Nissan','Renault','Mitsubishi','BYD','Peugeot','Citroën'],
+  'Van':         ['Mercedes-Benz','Renault','Volkswagen','Ford','Fiat','Peugeot','Citroën','Toyota','Iveco'],
+  'Caminhão':    ['Mercedes-Benz','Volvo','Scania','MAN','DAF','Iveco','Ford','Volkswagen','Renault','Agrale'],
+  'Ônibus':      ['Mercedes-Benz','Volvo','Scania','MAN','Agrale'],
+  'Microônibus': ['Mercedes-Benz','Volkswagen','Agrale','Iveco','Fiat'],
+  'Quadriciclo': ['Honda','Yamaha','Kawasaki','Polaris','Can-Am','CF Moto'],
+  'Trator':      ['John Deere','Massey Ferguson','New Holland','Valtra','Case','Agrale'],
+};
+
 const CORES_VEICULO = [
   'Branco','Preto','Prata','Cinza','Vermelho','Azul','Bege','Marrom','Verde',
   'Amarelo','Laranja','Vinho','Roxo','Dourado','Rosa',
 ];
-const currentYear = new Date().getFullYear();
-const ANOS_VEICULO = Array.from({ length: currentYear - 1999 }, (_, i) => String(currentYear - i));
 
 const SEXO_OPTS = [
   { value: '',  label: 'Selecione' },
@@ -102,7 +112,7 @@ const toApiDate = d => {
   return d;
 };
 
-const blankVeiculo = () => ({ modelo:'', marca:'', ano:'', placa:'', cor:'' });
+const blankVeiculo = () => ({ tipo:'', modelo:'', marca:'', placa:'', cor:'' });
 const blankForm    = () => ({
   pessoaId: null,
   nome:'', dataNascimento: null, cpf:'', rg:'', email:'', profissao:'',
@@ -168,7 +178,8 @@ export default function ClienteRegistroPage() {
   const [step,        setStep]        = useState(1);   // 1 | 2 | 3 | 'done'
   const [form,        setForm]        = useState(blankForm());
   const [isEdit,      setIsEdit]      = useState(false); // true = atualização
-  const [showErrors,  setShowErrors]  = useState(false);
+  const [showErrors,     setShowErrors]     = useState(false);
+  const [showVeicErrors, setShowVeicErrors] = useState(false);
   const [isSubmitting,setIsSubmitting]= useState(false);
   const [notif,       setNotif]       = useState(null);
   const notifTimer = useRef(null);
@@ -295,6 +306,13 @@ export default function ClienteRegistroPage() {
   };
   const goBack = () => setStep(s => s - 1);
 
+  const goToStep3 = () => {
+    const invalid = form.veiculos.some(v => !v.placa);
+    if (invalid) { setShowVeicErrors(true); showNotif('Informe a placa de todos os veículos (*).', 'error'); return; }
+    setShowVeicErrors(false);
+    setStep(3);
+  };
+
   // ── Submit ───────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     setIsSubmitting(true);
@@ -321,8 +339,9 @@ export default function ClienteRegistroPage() {
         empresas:        [],
         veiculos: form.veiculos.map(v => ({
           ...(v.id ? { id: v.id } : {}),
-          modelo: up(v.modelo), marca: up(v.marca),
-          ano:    Number(v.ano) || 0,
+          tipo:   up(v.tipo),
+          modelo: up(v.modelo),
+          marca:  up(v.marca),
           placa:  cleanPlaca(v.placa),
           cor:    up(v.cor),
         })),
@@ -585,51 +604,58 @@ export default function ClienteRegistroPage() {
                   </div>
                 )}
 
-                {form.veiculos.map((v, i) => (
-                  <div key={i} className={styles.veiculoBlock}>
-                    <div className={styles.veiculoHead}>
-                      <Car size={13} className={styles.iconGold} />
-                      <span>Veículo {i + 1}</span>
-                      {v.placa && <span className={styles.placaBadge}>{v.placa}</span>}
-                      <button className={styles.btnRemove} onClick={() => removeVeiculo(i)}><X size={12} /></button>
+                {form.veiculos.map((v, i) => {
+                  const placaErr = showVeicErrors && !v.placa;
+                  const marcas = MARCAS_POR_TIPO[v.tipo] ?? [];
+                  return (
+                    <div key={i} className={styles.veiculoBlock}>
+                      <div className={styles.veiculoHead}>
+                        <Car size={13} className={styles.iconGold} />
+                        <span>Veículo {i + 1}</span>
+                        {v.placa && <span className={styles.placaBadge}>{v.placa}</span>}
+                        <button className={styles.btnRemove} onClick={() => removeVeiculo(i)}><X size={12} /></button>
+                      </div>
+                      <div className={styles.grid3} style={{ marginBottom: 12 }}>
+                        <div className={styles.field}>
+                          <label className={styles.label}>Tipo</label>
+                          <select className={styles.input} value={v.tipo}
+                            onChange={e => { setVeiculo(i,'tipo',e.target.value); setVeiculo(i,'marca',''); }}>
+                            <option value="">Selecione</option>
+                            {TIPOS_VEICULO.map(t => <option key={t} value={t}>{t}</option>)}
+                          </select>
+                        </div>
+                        <div className={styles.field}>
+                          <label className={styles.label}>Modelo</label>
+                          <input className={styles.input} value={v.modelo}
+                            onChange={e => setVeiculo(i,'modelo',e.target.value)} placeholder="Ex: Civic" />
+                        </div>
+                        <div className={styles.field}>
+                          <label className={styles.label}>Marca</label>
+                          <Combobox value={v.marca} onChange={val => setVeiculo(i,'marca',val)}
+                            options={marcas} placeholder={v.tipo ? 'Selecione a marca' : 'Selecione o tipo antes'} />
+                        </div>
+                      </div>
+                      <div className={styles.grid2}>
+                        <div className={styles.field}>
+                          <label className={[styles.label, styles.req].join(' ')}>Placa</label>
+                          <input className={[styles.input, placaErr ? styles.inputErr : ''].join(' ')} value={v.placa}
+                            onChange={e => setVeiculo(i,'placa',maskPlaca(e.target.value))}
+                            placeholder="AAA0A00" maxLength={7} />
+                        </div>
+                        <div className={styles.field}>
+                          <label className={styles.label}>Cor</label>
+                          <Combobox value={v.cor} onChange={val => setVeiculo(i,'cor',val)}
+                            options={CORES_VEICULO} placeholder="Ex: Preto" />
+                        </div>
+                      </div>
                     </div>
-                    <div className={styles.grid3} style={{ marginBottom: 12 }}>
-                      <div className={styles.field}>
-                        <label className={styles.label}>Modelo</label>
-                        <input className={styles.input} value={v.modelo}
-                          onChange={e => setVeiculo(i,'modelo',e.target.value)} placeholder="Ex: Civic" />
-                      </div>
-                      <div className={styles.field}>
-                        <label className={styles.label}>Marca</label>
-                        <Combobox value={v.marca} onChange={val => setVeiculo(i,'marca',val)}
-                          options={MARCAS_VEICULO} placeholder="Ex: Honda" />
-                      </div>
-                      <div className={styles.field}>
-                        <label className={styles.label}>Ano</label>
-                        <Combobox value={v.ano} onChange={val => setVeiculo(i,'ano',val)}
-                          options={ANOS_VEICULO} placeholder="Ex: 2024" />
-                      </div>
-                    </div>
-                    <div className={styles.grid2}>
-                      <div className={styles.field}>
-                        <label className={styles.label}>Placa</label>
-                        <input className={styles.input} value={v.placa}
-                          onChange={e => setVeiculo(i,'placa',maskPlaca(e.target.value))}
-                          placeholder="AAA0A00" maxLength={7} />
-                      </div>
-                      <div className={styles.field}>
-                        <label className={styles.label}>Cor</label>
-                        <Combobox value={v.cor} onChange={val => setVeiculo(i,'cor',val)}
-                          options={CORES_VEICULO} placeholder="Ex: Preto" />
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
               <div className={styles.footer}>
                 <button className={styles.btn} onClick={goBack}><ChevronLeft size={14} /> Voltar</button>
-                <button className={[styles.btn, styles.btnPrimary].join(' ')} onClick={() => setStep(3)}>
+                <button className={[styles.btn, styles.btnPrimary].join(' ')} onClick={goToStep3}>
                   Próximo <ChevronRight size={14} />
                 </button>
               </div>
@@ -650,7 +676,7 @@ export default function ClienteRegistroPage() {
                     {(form.nome || '?')[0].toUpperCase()}
                   </div>
                   <div className={styles.confirmInfo}>
-                    <div className={styles.confirmName}>{form.nome || '—'}</div>
+                    <div className={styles.confirmName}>{up(form.nome) || '—'}</div>
                     <div className={styles.confirmMeta}>
                       CPF: {form.cpf}
                       {form.dataNascimento && ` · Nasc: ${form.dataNascimento.toLocaleDateString('pt-BR')}`}
@@ -668,8 +694,8 @@ export default function ClienteRegistroPage() {
                       <div key={i} className={styles.confirmCard} style={{ marginTop: 8 }}>
                         <div className={styles.confirmAvatar} style={{ fontSize: 18 }}>🚗</div>
                         <div className={styles.confirmInfo}>
-                          <div className={styles.confirmName}>{v.placa || '—'} · {[v.modelo, v.marca].filter(Boolean).join(' ') || '—'}</div>
-                          <div className={styles.confirmMeta}>Ano: {v.ano || '—'} · Cor: {v.cor || '—'}</div>
+                          <div className={styles.confirmName}>{up(v.placa) || '—'} · {[up(v.modelo), up(v.marca)].filter(Boolean).join(' ') || '—'}</div>
+                          <div className={styles.confirmMeta}>{[up(v.tipo), up(v.cor)].filter(Boolean).join(' · ') || '—'}</div>
                         </div>
                       </div>
                     ))}
