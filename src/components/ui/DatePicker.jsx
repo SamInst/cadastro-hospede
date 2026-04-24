@@ -46,6 +46,7 @@ export function DatePicker({
   placeholder = 'Selecione a data',
   label,
   error = false,
+  disablePopup = false,
 }) {
   const today = sod(new Date());
   const [open,         setOpen]         = useState(false);
@@ -156,8 +157,7 @@ export function DatePicker({
     setInputFocused(true);
     if (mode === 'single' && value) setInputText(fmtD(value));
     else setInputText('');
-    setOpen(true);
-    setViewMode('days');
+    if (!disablePopup) { setOpen(true); setViewMode('days'); }
   };
 
   const handleInputBlur = () => {
@@ -261,7 +261,7 @@ export function DatePicker({
 
       <div
         className={triggerCls}
-        onClick={() => { if (!open) { setOpen(true); setViewMode('days'); } }}
+        onClick={() => { if (!open && !disablePopup) { setOpen(true); setViewMode('days'); } }}
       >
         <svg className={styles.ico} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <rect x="3" y="4" width="18" height="18" rx="2"/>

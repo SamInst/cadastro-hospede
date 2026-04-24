@@ -393,6 +393,34 @@ select.input { cursor: pointer; }
   color: #8a7c70; font-size: 15px; font-weight: 300;
   line-height: 1.6; max-width: 320px; margin: 0 auto;
 }
+.doneSummary {
+  margin: 24px auto 0;
+  max-width: 360px;
+  border: 1px solid #ede8e3;
+  border-radius: 10px;
+  overflow: hidden;
+  text-align: left;
+}
+.doneSummaryRow {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 10px 16px;
+  font-size: 13px;
+  border-bottom: 1px solid #ede8e3;
+}
+.doneSummaryRow:last-child { border-bottom: none; }
+.doneSummaryRow span { color: #8a7c70; }
+.doneSummaryRow strong { color: #1a1612; font-weight: 600; }
+.doneWaBtn {
+  display: inline-flex; align-items: center; gap: 8px;
+  margin-top: 24px;
+  padding: 12px 24px;
+  background: #25d366; color: #fff;
+  border-radius: 8px;
+  font-size: 14px; font-weight: 600;
+  text-decoration: none;
+  transition: background .15s;
+}
+.doneWaBtn:hover { background: #1ebe5d; }
 
 /* ── Notification ── */
 .notif {
