@@ -101,3 +101,10 @@
 }
 .smCell:hover { background:rgba(184,149,90,.12); color:#b8955a; }
 .smActive { background:#b8955a !important; color:#fff !important; font-weight:700; }
+
+@media (max-width: 768px) {
+  .trigger,
+  .textInput {
+    font-size: 16px;
+  }
+}

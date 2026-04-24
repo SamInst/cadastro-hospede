@@ -440,3 +440,11 @@ select.input { cursor: pointer; }
 .notif.success { background: #27855a; color: #fff; }
 .notif.error   { background: #c0392b; color: #fff; }
 .notif.info    { background: #7a5200; color: #fff; }
+
+/* ── Prevent iOS auto-zoom on focus (requires font-size >= 16px) ── */
+@media (max-width: 768px) {
+  .input,
+  .comboInput {
+    font-size: 16px;
+  }
+}
