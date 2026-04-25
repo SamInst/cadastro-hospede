@@ -115,7 +115,7 @@ const toApiDate = d => {
 const blankVeiculo = () => ({ tipo:'', modelo:'', marca:'', placa:'', cor:'' });
 const blankForm    = () => ({
   pessoaId: null,
-  nome:'', dataNascimento: null, cpf:'', rg:'', email:'', profissao:'',
+  nome:'', dataNascimento: null, cpf:'', email:'', profissao:'',
   telefone:'', sexo:'', pais:'Brasil', estado:'', municipio:'',
   endereco:'', complemento:'', cep:'', bairro:'', numero:'',
   veiculos: [], status: 'ATIVO',
@@ -225,7 +225,6 @@ export default function ClienteRegistroPage() {
             nome:           found.nome ?? '',
             dataNascimento: parseApiDate(rawNasc),
             cpf:            masked,
-            rg:             found.rg ?? '',
             email:          found.email ?? '',
             profissao:      found.profissao ?? '',
             telefone:       maskPhone(found.telefone ?? ''),
@@ -295,7 +294,7 @@ export default function ClienteRegistroPage() {
   // ── Validação step 1 ────────────────────────────────────────────────────────
   const required1 = { cpf: form.cpf, nome: form.nome, dataNascimento: form.dataNascimento,
                       telefone: form.telefone, cep: form.cep,
-                      sexo: form.sexo, rg: form.rg, profissao: form.profissao, endereco: form.endereco };
+                      sexo: form.sexo, endereco: form.endereco };
   const missingField = f => !required1[f];
   const step1Valid = Object.values(required1).every(v => !!v) && cpfStatus !== 'invalid';
 
@@ -321,7 +320,6 @@ export default function ClienteRegistroPage() {
         nome:            up(form.nome),
         data_nascimento: toApiDate(form.dataNascimento),
         cpf:             unmask(form.cpf),
-        rg:              up(form.rg),
         email:           form.email.trim() || null,
         profissao:       up(form.profissao),
         telefone:        unmask(form.telefone),
@@ -486,8 +484,8 @@ export default function ClienteRegistroPage() {
                   </div>
                 </div>
 
-                {/* Tel + Sexo + RG */}
-                <div className={styles.grid3} style={{ marginBottom: 16 }}>
+                {/* Tel + Sexo */}
+                <div className={styles.grid2} style={{ marginBottom: 16 }}>
                   <div className={styles.field}>
                     <label className={[lblErr('telefone'), styles.req].join(' ')}>Telefone</label>
                     <input className={errCls('telefone')} value={form.telefone}
@@ -499,11 +497,6 @@ export default function ClienteRegistroPage() {
                       {SEXO_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                     </select>
                   </div>
-                  <div className={styles.field}>
-                    <label className={[lblErr('rg'), styles.req].join(' ')}>RG</label>
-                    <input className={errCls('rg')} value={form.rg}
-                      onChange={e => set('rg', e.target.value)} placeholder="RG" />
-                  </div>
                 </div>
 
                 {/* Email + Profissão */}
@@ -514,8 +507,8 @@ export default function ClienteRegistroPage() {
                       onChange={e => set('email', e.target.value)} placeholder="email@exemplo.com" />
                   </div>
                   <div className={styles.field}>
-                    <label className={[lblErr('profissao'), styles.req].join(' ')}>Profissão</label>
-                    <input className={errCls('profissao')} value={form.profissao}
+                    <label className={styles.label}>Profissão</label>
+                    <input className={styles.input} value={form.profissao}
                       onChange={e => set('profissao', e.target.value)} placeholder="Ex: Engenheiro" />
                   </div>
                 </div>
