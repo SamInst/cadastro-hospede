@@ -1,21 +1,19 @@
 /**
  * ClienteRegistroPage.jsx
  *
- * Página pública de auto-cadastro de hóspedes.
+ * Página pública de auto-cadastro de hóspedes — Isto É Pousada.
  * - Sem token (endpoint @PublicEndpoint)
  * - CPF já cadastrado → preenche todos os campos automaticamente
  * - Usa o DatePicker interno do projeto
  *
- * Coloque o arquivo em:  src/pages/registro/ClienteRegistroPage.jsx
- * Adicione a rota pública no seu router (sem RequireAuth):
- *   <Route path="/registro" element={<ClienteRegistroPage />} />
+ * Linguagem visual "Folio de Viana" — mesma do Guia do Hóspede.
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import {
   User, MapPin, Car, CheckCircle2, AlertTriangle,
   XCircle, Loader2, ChevronLeft, ChevronRight,
-  Plus, X, Building2, Check,
+  Plus, X, Check,
 } from 'lucide-react';
 
 import { DatePicker }  from '../../components/ui/DatePicker';
@@ -57,6 +55,14 @@ const SEXO_OPTS = [
   { value: '2', label: 'Feminino'  },
   { value: '3', label: 'Outro'     },
 ];
+
+const STEPS = [
+  { label: 'Dados',       n: 1 },
+  { label: 'Veículos',    n: 2 },
+  { label: 'Confirmação', n: 3 },
+];
+
+const WA_NUMBER = '5598988555038';
 
 // ── Utils ─────────────────────────────────────────────────────────────────────
 const maskCPF   = v => v.replace(/\D/g,'').slice(0,11)
@@ -121,24 +127,36 @@ const blankForm    = () => ({
   veiculos: [], status: 'ATIVO',
 });
 
+// ── WhatsApp / Pin glyphs ───────────────────────────────────────────────────────
+function WaIcon({ size = 15 }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" width={size} height={size}>
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+    </svg>
+  );
+}
+function PinIcon({ size = 13 }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width={size} height={size}>
+      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+      <circle cx="12" cy="9" r="2.5"/>
+    </svg>
+  );
+}
+
 // ── Combobox ──────────────────────────────────────────────────────────────────
 function Combobox({ value, onChange, options, placeholder }) {
   const [open, setOpen]   = useState(false);
   const [query, setQuery] = useState('');
   const ref = useRef(null);
 
-  useEffect(() => {
-    const h = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
-    document.addEventListener('mousedown', h);
-    return () => document.removeEventListener('mousedown', h);
-  }, []);
-
   const filtered = query
     ? options.filter(o => o.toLowerCase().includes(query.toLowerCase()))
     : options;
 
   return (
-    <div ref={ref} className={styles.comboWrap}>
+    <div ref={ref} className={styles.comboWrap}
+      onBlur={(e) => { if (!ref.current?.contains(e.relatedTarget)) setOpen(false); }}>
       <input
         className={styles.comboInput}
         value={open ? query : value}
@@ -166,9 +184,26 @@ function Notif({ notif }) {
   if (!notif) return null;
   return (
     <div className={[styles.notif, styles[notif.type]].join(' ')}>
-      {notif.type === 'success' && <Check size={14} />}
-      {notif.type === 'error'   && <XCircle size={14} />}
+      {notif.type === 'success' && <Check size={15} />}
+      {notif.type === 'error'   && <XCircle size={15} />}
+      {notif.type === 'info'    && <CheckCircle2 size={15} />}
       {notif.message}
+    </div>
+  );
+}
+
+// ── Section title ───────────────────────────────────────────────────────────────
+function SectionTitle({ icon, label }) {
+  return <div className={styles.secTitle}>{icon}<span>{label}</span></div>;
+}
+
+// ── Step intro ──────────────────────────────────────────────────────────────────
+function StepHead({ kicker, title, desc }) {
+  return (
+    <div className={styles.stepHead}>
+      <div className={styles.stepKicker}>{kicker}</div>
+      <h2 className={styles.stepTitle}>{title}</h2>
+      {desc && <p className={styles.stepDesc}>{desc}</p>}
     </div>
   );
 }
@@ -371,7 +406,7 @@ export default function ClienteRegistroPage() {
 
       setStep('done');
       const waMsg = encodeURIComponent(`${up(form.nome)}\nOlá, fiz meu cadastro no site.`);
-      window.open(`https://wa.me/5598988555038?text=${waMsg}`, '_blank');
+      window.open(`https://wa.me/${WA_NUMBER}?text=${waMsg}`, '_blank');
     } catch(e) {
       showNotif(e.message || 'Erro ao salvar.', 'error');
     } finally {
@@ -379,91 +414,86 @@ export default function ClienteRegistroPage() {
     }
   };
 
-  // ── CPF icon ─────────────────────────────────────────────────────────────────
+  // ── CPF visuals ──────────────────────────────────────────────────────────────
   const cpfIcon = cpfStatus === 'loading' ? <Loader2 size={15} className={styles.spin} />
     : cpfStatus === 'ok'      ? <CheckCircle2 size={15} className={styles.iconOk}   />
-    : cpfStatus === 'exists'  ? <AlertTriangle size={15} className={styles.iconErr} />
+    : cpfStatus === 'exists'  ? <CheckCircle2 size={15} className={styles.iconGold} />
     : cpfStatus === 'invalid' ? <XCircle size={15} className={styles.iconErr} />
     : null;
 
   const cpfCls = [
     styles.input,
-    cpfStatus === 'ok'      ? styles.inputOk   : '',
-    cpfStatus === 'exists'  ? styles.inputErr   : '',
-    cpfStatus === 'invalid' ? styles.inputErr  : '',
-    showErrors && !form.cpf ? styles.inputErr  : '',
+    cpfStatus === 'ok'       ? styles.inputOk   : '',
+    cpfStatus === 'exists'   ? styles.inputInfo : '',
+    cpfStatus === 'invalid'  ? styles.inputErr  : '',
+    showErrors && !form.cpf  ? styles.inputErr  : '',
   ].filter(Boolean).join(' ');
 
   const errCls = f => [styles.input, showErrors && missingField(f) ? styles.inputErr : ''].filter(Boolean).join(' ');
   const lblErr = f => [styles.label, showErrors && missingField(f) ? styles.labelErr : ''].filter(Boolean).join(' ');
 
-  // ── Step bar labels ──────────────────────────────────────────────────────────
-  const STEPS = ['Dados Pessoais', 'Veículos', 'Confirmação'];
-
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
-    <div className={styles.page}>
+    <div className={styles.shell}>
 
-      {/* ── decoração de fundo ── */}
-      <div className={styles.bgBlob1} />
-      <div className={styles.bgBlob2} />
+      {/* ── Masthead ── */}
+      <header className={styles.masthead}>
+        <p className={styles.eyebrow}>Cadastro de Hóspede</p>
+        <h1 className={styles.title}>Isto É <em>Pousada</em></h1>
+        <p className={styles.place}>Viana · Maranhão</p>
+        <p className={styles.welcome}>
+          Preencha seus dados para agilizar sua chegada. Já é nosso hóspede?
+          Informe o CPF e cuidamos do resto.
+        </p>
+      </header>
 
-      <div className={styles.wrap}>
+      {/* ── Stepper ── */}
+      {step !== 'done' && (
+        <div className={styles.steps}>
+          {STEPS.map((s) => {
+            const active = step === s.n;
+            const done   = typeof step === 'number' && step > s.n;
+            return (
+              <div key={s.n} className={[styles.step, active ? styles.stepActive : '', done ? styles.stepDone : ''].filter(Boolean).join(' ')}>
+                <span className={styles.stepNode}>{done ? <Check size={16} /> : s.n}</span>
+                <span className={styles.stepLabel}>{s.label}</span>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
-        {/* Header */}
-        <header className={styles.header}>
-          <div className={styles.headerLine} />
-          <h1 className={styles.title}>Cadastro de Hóspede</h1>
-          <p className={styles.subtitle}>Seus dados são utilizados conforme a LGPD (Lei nº 13.709/2018).</p>
-          <p className={styles.subtitle}>Preencha seus dados para concluir seu checkin</p>
-        </header>
+      {/* ── Card ── */}
+      <div className={styles.card}>
 
-        <div className={styles.card}>
+        {/* ══ STEP 1 ══════════════════════════════════════════════════════════ */}
+        {step === 1 && (
+          <>
+            <div className={styles.body}>
+              <StepHead kicker="Etapa 1 de 3" title="Seus dados pessoais"
+                desc="Comece pelo CPF — se já tiver cadastro, preenchemos o restante." />
 
-          {/* Steps bar */}
-          {step !== 'done' && (
-            <div className={styles.stepsBar}>
-              {STEPS.map((label, i) => {
-                const n = i + 1;
-                const state = step === n ? 'active' : (typeof step === 'number' && step > n) ? 'done' : '';
-                return (
-                  <div key={label} className={[styles.stepItem, styles[state]].filter(Boolean).join(' ')}>
-                    <div className={styles.stepNum}>
-                      {state === 'done' ? <Check size={11} /> : n}
-                    </div>
-                    <span className={styles.stepLabel}>{label}</span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* ══ STEP 1: Dados Pessoais ══════════════════════════════════════════ */}
-          {step === 1 && (
-            <>
-              <div className={styles.body}>
-
+              <div className={styles.stagger}>
                 {isEdit && (
-                  <div className={styles.infoBanner}>
-                    <AlertTriangle size={14} />
-                    Cadastro existente carregado. Atualize os campos necessários e confirme.
+                  <div className={styles.note}>
+                    <AlertTriangle size={18} />
+                    <span><strong>Cadastro encontrado.</strong> Confira e atualize o que for necessário antes de confirmar.</span>
                   </div>
                 )}
 
-                <SectionDiv icon={<User size={12} />} label="Dados Pessoais" />
+                <SectionTitle icon={<User size={14} />} label="Identificação" />
 
-                {/* CPF + Nome + Nasc */}
-                <div className={styles.gridCpfRow} style={{ marginBottom: 16 }}>
+                <div className={styles.gridCpf} style={{ marginBottom: 16 }}>
                   <div className={styles.field}>
                     <label className={[styles.label, styles.req, showErrors && !form.cpf ? styles.labelErr : ''].filter(Boolean).join(' ')}>CPF</label>
                     <div className={styles.inputWrap}>
                       <input className={cpfCls} value={form.cpf} onChange={e => handleCPF(e.target.value)}
-                        placeholder="000.000.000-00" maxLength={14} autoComplete="off" />
+                        placeholder="000.000.000-00" maxLength={14} autoComplete="off" inputMode="numeric" />
                       {cpfIcon && <span className={styles.inputSuffix}>{cpfIcon}</span>}
                     </div>
-                    {cpfStatus === 'invalid' && <span className={styles.fieldMsg} style={{ color:'#c0392b' }}>CPF inválido</span>}
-                    {cpfStatus === 'exists'  && <span className={styles.fieldMsg} style={{ color:'#c0392b' }}>CPF já cadastrado</span>}
-                    {cpfStatus === 'ok'      && <span className={styles.fieldMsg} style={{ color:'#27855a' }}>CPF disponível</span>}
+                    {cpfStatus === 'invalid' && <span className={[styles.fieldMsg, styles.msgErr].join(' ')}>CPF inválido</span>}
+                    {cpfStatus === 'exists'  && <span className={[styles.fieldMsg, styles.msgInfo].join(' ')}>Cadastro encontrado</span>}
+                    {cpfStatus === 'ok'      && <span className={[styles.fieldMsg, styles.msgOk].join(' ')}>CPF disponível</span>}
                   </div>
                   <div className={styles.field}>
                     <label className={[lblErr('nome'), styles.req].join(' ')}>Nome completo</label>
@@ -484,12 +514,11 @@ export default function ClienteRegistroPage() {
                   </div>
                 </div>
 
-                {/* Tel + Sexo */}
                 <div className={styles.grid2} style={{ marginBottom: 16 }}>
                   <div className={styles.field}>
                     <label className={[lblErr('telefone'), styles.req].join(' ')}>Telefone</label>
                     <input className={errCls('telefone')} value={form.telefone}
-                      onChange={e => set('telefone', maskPhone(e.target.value))} placeholder="(00) 00000-0000" />
+                      onChange={e => set('telefone', maskPhone(e.target.value))} placeholder="(00) 00000-0000" inputMode="tel" />
                   </div>
                   <div className={styles.field}>
                     <label className={[lblErr('sexo'), styles.req].join(' ')}>Sexo</label>
@@ -499,11 +528,10 @@ export default function ClienteRegistroPage() {
                   </div>
                 </div>
 
-                {/* Email + Profissão */}
                 <div className={styles.grid2} style={{ marginBottom: 16 }}>
                   <div className={styles.field}>
                     <label className={styles.label}>Email</label>
-                    <input className={errCls('email')} type="email" value={form.email}
+                    <input className={styles.input} type="email" value={form.email}
                       onChange={e => set('email', e.target.value)} placeholder="email@exemplo.com" />
                   </div>
                   <div className={styles.field}>
@@ -513,16 +541,15 @@ export default function ClienteRegistroPage() {
                   </div>
                 </div>
 
-                <SectionDiv icon={<MapPin size={12} />} label="Endereço" />
+                <SectionTitle icon={<MapPin size={14} />} label="Endereço" />
 
-                {/* CEP + País + Estado */}
                 <div className={styles.grid3} style={{ marginBottom: 16 }}>
                   <div className={styles.field}>
                     <label className={[lblErr('cep'), styles.req].join(' ')}>CEP</label>
                     <div className={styles.inputWrap}>
                       <input className={errCls('cep')} value={form.cep}
-                        onChange={e => handleCEP(e.target.value)} placeholder="00000-000" />
-                      {cepLoading && <span className={styles.inputSuffix}><Loader2 size={13} className={styles.spin} /></span>}
+                        onChange={e => handleCEP(e.target.value)} placeholder="00000-000" inputMode="numeric" />
+                      {cepLoading && <span className={styles.inputSuffix}><Loader2 size={14} className={styles.spin} /></span>}
                     </div>
                   </div>
                   <div className={styles.field}>
@@ -536,7 +563,6 @@ export default function ClienteRegistroPage() {
                   </div>
                 </div>
 
-                {/* Município + Bairro */}
                 <div className={styles.grid2} style={{ marginBottom: 16 }}>
                   <div className={styles.field}>
                     <label className={styles.label}>Município</label>
@@ -548,7 +574,6 @@ export default function ClienteRegistroPage() {
                   </div>
                 </div>
 
-                {/* Endereço + Número */}
                 <div className={styles.grid3} style={{ marginBottom: 16 }}>
                   <div className={[styles.field, styles.span2].join(' ')}>
                     <label className={[lblErr('endereco'), styles.req].join(' ')}>Endereço</label>
@@ -558,7 +583,7 @@ export default function ClienteRegistroPage() {
                   <div className={styles.field}>
                     <label className={styles.label}>Número</label>
                     <input className={styles.input} value={form.numero}
-                      onChange={e => set('numero', e.target.value)} placeholder="0" />
+                      onChange={e => set('numero', e.target.value)} placeholder="0" inputMode="numeric" />
                   </div>
                 </div>
 
@@ -567,32 +592,35 @@ export default function ClienteRegistroPage() {
                   <input className={styles.input} value={form.complemento}
                     onChange={e => set('complemento', e.target.value)} placeholder="Apto, Bloco..." />
                 </div>
-
               </div>
+            </div>
 
-              <div className={styles.footer}>
-                <button className={[styles.btn, styles.btnPrimary].join(' ')} onClick={goNext}>
-                  Próximo <ChevronRight size={14} />
-                </button>
-              </div>
-            </>
-          )}
+            <div className={styles.footer}>
+              <button className={[styles.btn, styles.btnPrimary].join(' ')} onClick={goNext}>
+                Continuar <ChevronRight size={15} />
+              </button>
+            </div>
+          </>
+        )}
 
-          {/* ══ STEP 2: Veículos ════════════════════════════════════════════════ */}
-          {step === 2 && (
-            <>
-              <div className={styles.body}>
+        {/* ══ STEP 2 ══════════════════════════════════════════════════════════ */}
+        {step === 2 && (
+          <>
+            <div className={styles.body}>
+              <StepHead kicker="Etapa 2 de 3" title="Veículos"
+                desc="Opcional — registre veículos que ficarão na pousada." />
+
+              <div className={styles.stagger}>
                 <div className={styles.secRow}>
-                  <SectionDiv icon={<Car size={12} />} label="Veículos" />
+                  <SectionTitle icon={<Car size={14} />} label={`Veículos${form.veiculos.length ? ` (${form.veiculos.length})` : ''}`} />
                   <button className={[styles.btn, styles.btnSm].join(' ')} onClick={addVeiculo}>
-                    <Plus size={12} /> Adicionar
+                    <Plus size={13} /> Adicionar
                   </button>
                 </div>
-                <p className={styles.hint}>Opcional — adicione veículos se quiser que fiquem registrados.</p>
 
                 {form.veiculos.length === 0 && (
-                  <div className={styles.emptyVeiculos}>
-                    <Car size={32} opacity={0.15} />
+                  <div className={styles.emptyVeh}>
+                    <Car size={30} style={{ opacity: 0.4, color: 'var(--accent)' }} />
                     <span>Nenhum veículo adicionado</span>
                   </div>
                 )}
@@ -601,12 +629,12 @@ export default function ClienteRegistroPage() {
                   const placaErr = showVeicErrors && !v.placa;
                   const marcas = MARCAS_POR_TIPO[v.tipo] ?? [];
                   return (
-                    <div key={i} className={styles.veiculoBlock}>
-                      <div className={styles.veiculoHead}>
-                        <Car size={13} className={styles.iconGold} />
+                    <div key={i} className={styles.vehCard}>
+                      <div className={styles.vehHead}>
+                        <Car size={15} />
                         <span>Veículo {i + 1}</span>
                         {v.placa && <span className={styles.placaBadge}>{v.placa}</span>}
-                        <button className={styles.btnRemove} onClick={() => removeVeiculo(i)}><X size={12} /></button>
+                        <button className={styles.btnRemove} onClick={() => removeVeiculo(i)}><X size={14} /></button>
                       </div>
                       <div className={styles.grid3} style={{ marginBottom: 12 }}>
                         <div className={styles.field}>
@@ -645,151 +673,123 @@ export default function ClienteRegistroPage() {
                   );
                 })}
               </div>
+            </div>
 
-              <div className={styles.footer}>
-                <button className={styles.btn} onClick={goBack}><ChevronLeft size={14} /> Voltar</button>
-                <button className={[styles.btn, styles.btnPrimary].join(' ')} onClick={goToStep3}>
-                  Próximo <ChevronRight size={14} />
-                </button>
-              </div>
-            </>
-          )}
+            <div className={styles.footer}>
+              <button className={[styles.btn, styles.btnGhost].join(' ')} onClick={goBack}><ChevronLeft size={15} /> Voltar</button>
+              <button className={[styles.btn, styles.btnPrimary].join(' ')} onClick={goToStep3}>
+                Continuar <ChevronRight size={15} />
+              </button>
+            </div>
+          </>
+        )}
 
-          {/* ══ STEP 3: Confirmação ═════════════════════════════════════════════ */}
-          {step === 3 && (
-            <>
-              <div className={styles.body}>
-                <SectionDiv icon={<CheckCircle2 size={12} />} label="Confirme seus dados" />
-                <p className={styles.hint} style={{ marginBottom: 20 }}>
-                  {isEdit ? 'Seus dados serão atualizados com as informações abaixo.' : 'Revise antes de finalizar o cadastro.'}
-                </p>
+        {/* ══ STEP 3 ══════════════════════════════════════════════════════════ */}
+        {step === 3 && (
+          <>
+            <div className={styles.body}>
+              <StepHead kicker="Etapa 3 de 3" title="Confirme seus dados"
+                desc={isEdit ? 'Seus dados serão atualizados com as informações abaixo.' : 'Revise antes de finalizar o cadastro.'} />
 
+              <div className={styles.stagger}>
                 <div className={styles.confirmCard}>
-                  <div className={styles.confirmAvatar}>
-                    {(form.nome || '?')[0].toUpperCase()}
-                  </div>
+                  <div className={styles.confirmAvatar}>{(form.nome || '?')[0].toUpperCase()}</div>
                   <div className={styles.confirmInfo}>
                     <div className={styles.confirmName}>{up(form.nome) || '—'}</div>
                     <div className={styles.confirmMeta}>
                       CPF: {form.cpf}
                       {form.dataNascimento && ` · Nasc: ${form.dataNascimento.toLocaleDateString('pt-BR')}`}
                     </div>
-                    <div className={styles.confirmMeta}>{form.telefone} · {form.email}</div>
+                    <div className={styles.confirmMeta}>{[form.telefone, form.email].filter(Boolean).join(' · ')}</div>
                     {form.cep && <div className={styles.confirmMeta}>{form.cep} — {[form.municipio, form.estado].filter(Boolean).join(', ')}</div>}
                   </div>
                   {isEdit && <span className={styles.editBadge}>Atualização</span>}
                 </div>
 
                 {form.veiculos.length > 0 && (
-                  <div style={{ marginTop: 16 }}>
-                    <p className={styles.confirmSubtitle}>Veículos</p>
+                  <>
+                    <p className={styles.confirmSub}>Veículos</p>
                     {form.veiculos.map((v, i) => (
-                      <div key={i} className={styles.confirmCard} style={{ marginTop: 8 }}>
-                        <div className={styles.confirmAvatar} style={{ fontSize: 18 }}>🚗</div>
+                      <div key={i} className={styles.confirmCard}>
+                        <div className={styles.confirmAvatar}><Car size={20} /></div>
                         <div className={styles.confirmInfo}>
                           <div className={styles.confirmName}>{up(v.placa) || '—'} · {[up(v.modelo), up(v.marca)].filter(Boolean).join(' ') || '—'}</div>
                           <div className={styles.confirmMeta}>{[up(v.tipo), up(v.cor)].filter(Boolean).join(' · ') || '—'}</div>
                         </div>
                       </div>
                     ))}
-                  </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className={styles.footer}>
+              <button className={[styles.btn, styles.btnGhost].join(' ')} onClick={goBack} disabled={isSubmitting}>
+                <ChevronLeft size={15} /> Voltar
+              </button>
+              <button className={[styles.btn, styles.btnPrimary].join(' ')} onClick={handleSubmit} disabled={isSubmitting}>
+                {isSubmitting
+                  ? <><Loader2 size={14} className={styles.spin} /> Salvando...</>
+                  : isEdit ? <>Confirmar Atualização <Check size={15} /></> : <>Confirmar Cadastro <Check size={15} /></>
+                }
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* ══ DONE ════════════════════════════════════════════════════════════ */}
+        {step === 'done' && (() => {
+          const nome = up(form.nome);
+          const waMsg = encodeURIComponent(`${nome}\nOlá, fiz meu cadastro no site.`);
+          const waUrl = `https://wa.me/${WA_NUMBER}?text=${waMsg}`;
+          return (
+            <div className={styles.done}>
+              <div className={styles.doneMark}><Check size={38} strokeWidth={2.4} /></div>
+              <h2 className={styles.doneTitle}>{isEdit ? 'Dados atualizados!' : 'Cadastro realizado!'}</h2>
+              <p className={styles.doneText}>
+                {isEdit
+                  ? 'Suas informações foram atualizadas com sucesso.'
+                  : 'Seja bem-vindo(a)! Seu cadastro foi registrado com sucesso.'}
+              </p>
+
+              <div className={styles.doneSummary}>
+                <div className={styles.doneRow}><span>Nome</span><strong>{nome || '—'}</strong></div>
+                <div className={styles.doneRow}><span>CPF</span><strong>{form.cpf || '—'}</strong></div>
+                {form.dataNascimento && (
+                  <div className={styles.doneRow}><span>Nascimento</span><strong>{form.dataNascimento.toLocaleDateString('pt-BR')}</strong></div>
+                )}
+                <div className={styles.doneRow}><span>Telefone</span><strong>{form.telefone || '—'}</strong></div>
+                {form.email && <div className={styles.doneRow}><span>Email</span><strong>{form.email}</strong></div>}
+                {form.municipio && (
+                  <div className={styles.doneRow}><span>Cidade</span><strong>{[form.municipio, form.estado].filter(Boolean).join(' / ')}</strong></div>
                 )}
               </div>
 
-              <div className={styles.footer}>
-                <button className={styles.btn} onClick={goBack} disabled={isSubmitting}>
-                  <ChevronLeft size={14} /> Voltar
-                </button>
-                <button className={[styles.btn, styles.btnPrimary].join(' ')} onClick={handleSubmit} disabled={isSubmitting}>
-                  {isSubmitting
-                    ? <><Loader2 size={13} className={styles.spin} /> Salvando...</>
-                    : isEdit ? 'Confirmar Atualização' : 'Confirmar Cadastro'
-                  }
-                </button>
-              </div>
-            </>
-          )}
+              <a href={waUrl} target="_blank" rel="noopener noreferrer" className={styles.doneWa}>
+                <WaIcon size={18} /> Falar no WhatsApp
+              </a>
+            </div>
+          );
+        })()}
 
-          {/* ══ DONE ════════════════════════════════════════════════════════════ */}
-          {step === 'done' && (() => {
-            const nome = up(form.nome);
-            const waMsg = encodeURIComponent(`${nome}\nOlá, fiz meu cadastro no site.`);
-            const waUrl = `https://wa.me/5598988555038?text=${waMsg}`;
-            return (
-              <div className={styles.doneScreen}>
-                <div className={styles.doneIcon}>✓</div>
-                <h2 className={styles.doneTitle}>
-                  {isEdit ? 'Dados atualizados!' : 'Cadastro realizado!'}
-                </h2>
-                <p className={styles.doneText}>
-                  {isEdit
-                    ? 'Suas informações foram atualizadas com sucesso.'
-                    : 'Bem-vindo(a)! Seu cadastro foi registrado com sucesso.'}
-                </p>
+      </div>{/* /card */}
 
-                <div className={styles.doneSummary}>
-                  <div className={styles.doneSummaryRow}><span>Nome</span><strong>{nome || '—'}</strong></div>
-                  <div className={styles.doneSummaryRow}><span>CPF</span><strong>{form.cpf || '—'}</strong></div>
-                  {form.dataNascimento && (
-                    <div className={styles.doneSummaryRow}><span>Nascimento</span><strong>{form.dataNascimento.toLocaleDateString('pt-BR')}</strong></div>
-                  )}
-                  <div className={styles.doneSummaryRow}><span>Telefone</span><strong>{form.telefone || '—'}</strong></div>
-                  {form.email && <div className={styles.doneSummaryRow}><span>Email</span><strong>{form.email}</strong></div>}
-                  {form.municipio && (
-                    <div className={styles.doneSummaryRow}><span>Cidade</span><strong>{[form.municipio, form.estado].filter(Boolean).join(' / ')}</strong></div>
-                  )}
-                </div>
-
-                <a href={waUrl} target="_blank" rel="noopener noreferrer" className={styles.doneWaBtn}>
-                  <svg viewBox="0 0 24 24" fill="currentColor" width="18" height="18">
-                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-                  </svg>
-                  Falar no WhatsApp
-                </a>
-              </div>
-            );
-          })()}
-
-        </div>{/* /card */}
-
-        <div className={styles.brandCard}>
-<div className={styles.brandInfo}>
-            <span className={styles.brandName}>Isto É Pousada</span>
-            <span className={styles.brandSub}>Referência na Baixada Maranhense</span>
-            <a
-              href="https://wa.me/5598988555038"
-              target="_blank"
-              rel="noopener noreferrer"
-              className={styles.brandPhone}
-            >
-              <svg viewBox="0 0 24 24" fill="currentColor" width="15" height="15">
-                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-              </svg>
-              (98) 98855-5038
-            </a>
-            <span className={styles.brandAddr}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="13" height="13">
-                <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
-                <circle cx="12" cy="9" r="2.5"/>
-              </svg>
-              Rodovia MA014 KM38, N612
-            </span>
-          </div>
+      {/* ── Colophon ── */}
+      <footer className={styles.colophon}>
+        <div className={styles.ornament}>✦</div>
+        <div className={styles.cphBrand}>Isto É Pousada</div>
+        <div className={styles.cphLinks}>
+          <a className={styles.cphPhone} href={`https://wa.me/${WA_NUMBER}`} target="_blank" rel="noopener noreferrer">
+            <WaIcon size={13} /> (98) 98855-5038
+          </a>
+          <span className={styles.cphAddr}><PinIcon size={12} /> Rodovia MA014 KM38, N612 · Viana</span>
         </div>
-
-      </div>{/* /wrap */}
+        <span className={styles.cphLgpd}>
+          Seus dados são tratados conforme a LGPD (Lei nº 13.709/2018) e usados apenas para a sua hospedagem.
+        </span>
+      </footer>
 
       <Notif notif={notif} />
-    </div>
-  );
-}
-
-// ── Section Divider (local) ───────────────────────────────────────────────────
-function SectionDiv({ icon, label }) {
-  return (
-    <div className={styles.secDiv}>
-      {icon}
-      <span>{label}</span>
     </div>
   );
 }
