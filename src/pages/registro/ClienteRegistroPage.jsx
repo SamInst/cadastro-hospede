@@ -60,7 +60,7 @@ const STEPS = [
   { label: 'Confirmação', n: 3 },
 ];
 
-const WA_NUMBER = import.meta.env.VITE_WHATSAPP_NUMBER || '5598988555038';
+const WA_NUMBER = import.meta.env.VITE_WHATSAPP_NUMBER;
 
 // ── Utils ─────────────────────────────────────────────────────────────────────
 const maskCPF   = v => v.replace(/\D/g,'').slice(0,11)
