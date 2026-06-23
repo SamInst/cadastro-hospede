@@ -23,7 +23,7 @@ import styles          from './ClienteRegistroPage.module.css';
 const BASE_URL_LOCAL = 'http://localhost:8080';
 const BASE_URL_PROD  = 'https://saas-hotel-istoepousada-dc98593a88fc.herokuapp.com';
 
-// ▶ Troque para BASE_URL_PROD ao publicar
+// Configurável por ambie// ▶ Troque para BASE_URL_PROD ao publicar
 const BASE_URL = BASE_URL_PROD;
 
 // ── Listas ────────────────────────────────────────────────────────────────────
@@ -662,22 +662,7 @@ export default function ClienteRegistroPage() {
                           <input className={[styles.input, placaErr ? styles.inputErr : ''].join(' ')} value={v.placa}
                             onChange={e => setVeiculo(i,'placa',maskPlaca(e.target.value))}
                             placeholder="AAA0A00" maxLength={7} />
-                        </div>
-                        <div className={styles.field}>
-                          <label className={styles.label}>Cor</label>
-                          <Combobox value={v.cor} onChange={val => setVeiculo(i,'cor',val)}
-                            options={CORES_VEICULO} placeholder="Ex: Preto" />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className={styles.footer}>
-              <button className={[styles.btn, styles.btnGhost].join(' ')} onClick={goBack}><ChevronLeft size={15} /> Voltar</button>
-              <button className={[styles.btn, styles.btnPrimary].join(' ')} onClick={goToStep3}>
+ame={[styles.btn, styles.btnPrimary].join(' ')} onClick={goToStep3}>
                 Continuar <ChevronRight size={15} />
               </button>
             </div>
