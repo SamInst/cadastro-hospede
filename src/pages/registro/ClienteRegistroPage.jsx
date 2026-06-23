@@ -23,8 +23,9 @@ import styles          from './ClienteRegistroPage.module.css';
 const BASE_URL_LOCAL = 'http://localhost:8080';
 const BASE_URL_PROD  = 'https://saas-hotel-istoepousada-dc98593a88fc.herokuapp.com';
 
-// ▶ Troque para BASE_URL_PROD ao publicar
-const BASE_URL = BASE_URL_PROD;
+// Configurável por ambiente: defina VITE_API_BASE_URL no .env (ex.: a URL de
+// produção ao publicar). Sem variável, cai para o backend local.
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || BASE_URL_LOCAL;
 
 // ── Listas ────────────────────────────────────────────────────────────────────
 const TIPOS_VEICULO = [
@@ -77,6 +78,8 @@ const maskPlaca = v => v.replace(/[^A-Za-z0-9]/g,'').slice(0,7).toUpperCase();
 const unmask    = v => (v ?? '').replace(/\D/g,'');
 const up        = v => (v ?? '').toUpperCase().trim();
 const cleanPlaca= v => (v ?? '').replace(/[^A-Za-z0-9]/g,'').toUpperCase();
+// Placa válida: AAA0A00 (Mercosul) ou AAA0000 (antiga)
+const validarPlaca = p => /^[A-Z]{3}[0-9][A-Z0-9][0-9]{2}$/.test(cleanPlaca(p));
 
 const validarCPF = cpf => {
   const n = cpf.replace(/\D/g,'');
@@ -247,11 +250,13 @@ export default function ClienteRegistroPage() {
     clearTimeout(cpfDebounce.current);
     cpfDebounce.current = setTimeout(async () => {
       try {
-        const res  = await fetch(`${BASE_URL}/pessoa?termo=${raw}&size=1`);
-        const data = await res.json();
-        const found = (data?.content ?? [])[0];
+        // Endpoint público dedicado: busca por CPF EXATO, sem busca por nome/termo
+        // (que exige autenticação) — evita enumeração de dados pessoais.
+        // 200 → cadastrado · 204 → CPF válido e não cadastrado · 400 → CPF inválido
+        const res = await fetch(`${BASE_URL}/pessoa/cpf/${raw}`);
 
-        if (found) {
+        if (res.status === 200) {
+          const found = await res.json();
           setCpfStatus('exists');
           // ── Preenche todos os campos com os dados da pessoa ──
           const rawNasc = found.data_nascimento ?? found.dataNascimento ?? '';
@@ -284,11 +289,16 @@ export default function ClienteRegistroPage() {
           });
           setIsEdit(true);
           showNotif('Cadastro encontrado — campos preenchidos automaticamente.', 'info');
-        } else {
+        } else if (res.status === 204) {
           setCpfStatus('ok');
           setIsEdit(false);
           // limpa tudo exceto o CPF
           setForm(p => ({ ...blankForm(), cpf: p.cpf }));
+        } else if (res.status === 429) {
+          setCpfStatus(null);
+          showNotif('Muitas tentativas. Aguarde alguns instantes.', 'error');
+        } else {
+          setCpfStatus(null);
         }
       } catch {
         setCpfStatus(null);
@@ -309,11 +319,11 @@ export default function ClienteRegistroPage() {
           setForm(p => ({
             ...p,
             cep:       masked,
-            endereco:  d.endereco              || p.endereco,
-            bairro:    d.bairro                || p.bairro,
-            pais:      d.pais?.descricao       || p.pais,
-            estado:    d.estado?.descricao     || p.estado,
-            municipio: d.municipio?.descricao  || p.municipio,
+            endereco:  d.endereco   || p.endereco,
+            bairro:    d.bairro     || p.bairro,
+            pais:      d.pais       || p.pais,
+            estado:    d.estado     || p.estado,
+            municipio: d.municipio  || p.municipio,
           }));
         }
       } finally { setCepLoading(false); }
@@ -331,18 +341,33 @@ export default function ClienteRegistroPage() {
                       telefone: form.telefone, cep: form.cep,
                       sexo: form.sexo, endereco: form.endereco };
   const missingField = f => !required1[f];
-  const step1Valid = Object.values(required1).every(v => !!v) && cpfStatus !== 'invalid';
+
+  // Validações de formato/completude
+  const cpfCompleto    = validarCPF(unmask(form.cpf));                       // 11 dígitos + dígitos verificadores
+  const telefoneValido = [10, 11].includes(unmask(form.telefone).length);   // (xx) xxxx-xxxx ou (xx) 9 xxxx-xxxx
+  const emailValido    = !form.email.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim());
 
   const goNext = () => {
-    if (!step1Valid) { setShowErrors(true); showNotif('Preencha todos os campos obrigatórios (*).', 'error'); return; }
+    setShowErrors(true);
+    if (Object.values(required1).some(v => !v)) {
+      showNotif('Preencha todos os campos obrigatórios (*).', 'error'); return;
+    }
+    if (!cpfCompleto)    { showNotif('Informe um CPF válido (11 dígitos).', 'error'); return; }
+    if (!telefoneValido) { showNotif('Informe um telefone válido: (xx) xxxxx-xxxx.', 'error'); return; }
+    if (!emailValido)    { showNotif('Informe um e-mail válido (ex: nome@email.com).', 'error'); return; }
     setShowErrors(false);
     setStep(s => s + 1);
   };
   const goBack = () => setStep(s => s - 1);
 
   const goToStep3 = () => {
-    const invalid = form.veiculos.some(v => !v.placa);
-    if (invalid) { setShowVeicErrors(true); showNotif('Informe a placa de todos os veículos (*).', 'error'); return; }
+    setShowVeicErrors(true);
+    if (form.veiculos.some(v => !v.placa)) {
+      showNotif('Informe a placa de todos os veículos (*).', 'error'); return;
+    }
+    if (form.veiculos.some(v => !validarPlaca(v.placa))) {
+      showNotif('Informe uma placa válida: AAA0A00 ou AAA0000.', 'error'); return;
+    }
     setShowVeicErrors(false);
     setStep(3);
   };
@@ -351,6 +376,8 @@ export default function ClienteRegistroPage() {
   const handleSubmit = async () => {
     setIsSubmitting(true);
     try {
+      // Apenas campos que o próprio hóspede pode informar. status / titular /
+      // empresas / funcionario / id são controlados pelo servidor (upsert por CPF).
       const body = {
         nome:            up(form.nome),
         data_nascimento: toApiDate(form.dataNascimento),
@@ -367,40 +394,37 @@ export default function ClienteRegistroPage() {
         bairro:          up(form.bairro),
         sexo:            Number(form.sexo) || 1,
         numero:          up(form.numero),
-        status:          form.status ?? 'ATIVO',
-        titular:         null,
-        empresas:        [],
         veiculos: form.veiculos.map(v => ({
           ...(v.id ? { id: v.id } : {}),
-          tipo:   up(v.tipo),
           modelo: up(v.modelo),
           marca:  up(v.marca),
           placa:  cleanPlaca(v.placa),
           cor:    up(v.cor),
         })),
-        funcionario: null,
       };
 
-      let res;
-      if (isEdit && form.pessoaId) {
-        // Atualização → PUT /pessoa
-        res = await fetch(`${BASE_URL}/pessoa`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: form.pessoaId, ...body }),
-        });
-      } else {
-        // Novo cadastro → POST /pessoa (sem token, @PublicEndpoint)
-        res = await fetch(`${BASE_URL}/pessoa`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ pessoas: [body], empresas: [] }),
-        });
-      }
+      // Endpoint público único de escrita — o servidor decide criar/atualizar
+      // pelo CPF (sem id do cliente → sem IDOR).
+      const res = await fetch(`${BASE_URL}/pessoa/auto-cadastro`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
 
       if (!res.ok) {
-        let msg = 'Erro ao salvar cadastro.';
-        try { const d = await res.json(); msg = d?.message || d?.error || msg; } catch {}
+        // Mostra a mensagem do servidor apenas em erros de validação (4xx),
+        // que são controlados. Para 5xx, mensagem genérica — não expõe internos.
+        let msg = res.status === 429
+          ? 'Muitas tentativas. Aguarde alguns instantes e tente novamente.'
+          : 'Erro ao salvar cadastro. Tente novamente.';
+        if (res.status >= 400 && res.status < 500 && res.status !== 429) {
+          try {
+            const d = await res.json();
+            if (d?.message) msg = d.message;
+          } catch {
+            // corpo não-JSON: mantém a mensagem genérica
+          }
+        }
         throw new Error(msg);
       }
 
@@ -423,10 +447,10 @@ export default function ClienteRegistroPage() {
 
   const cpfCls = [
     styles.input,
-    cpfStatus === 'ok'       ? styles.inputOk   : '',
-    cpfStatus === 'exists'   ? styles.inputInfo : '',
-    cpfStatus === 'invalid'  ? styles.inputErr  : '',
-    showErrors && !form.cpf  ? styles.inputErr  : '',
+    cpfStatus === 'ok'           ? styles.inputOk   : '',
+    cpfStatus === 'exists'       ? styles.inputInfo : '',
+    cpfStatus === 'invalid'      ? styles.inputErr  : '',
+    showErrors && !cpfCompleto   ? styles.inputErr  : '',
   ].filter(Boolean).join(' ');
 
   const errCls = f => [styles.input, showErrors && missingField(f) ? styles.inputErr : ''].filter(Boolean).join(' ');
@@ -438,6 +462,7 @@ export default function ClienteRegistroPage() {
 
       {/* ── Masthead ── */}
       <header className={styles.masthead}>
+        <div className={styles.brandMark}>IÉ</div>
         <p className={styles.eyebrow}>Cadastro de Hóspede</p>
         <h1 className={styles.title}>Isto É <em>Pousada</em></h1>
         <p className={styles.place}>Viana · Maranhão</p>
@@ -494,6 +519,8 @@ export default function ClienteRegistroPage() {
                     {cpfStatus === 'invalid' && <span className={[styles.fieldMsg, styles.msgErr].join(' ')}>CPF inválido</span>}
                     {cpfStatus === 'exists'  && <span className={[styles.fieldMsg, styles.msgInfo].join(' ')}>Cadastro encontrado</span>}
                     {cpfStatus === 'ok'      && <span className={[styles.fieldMsg, styles.msgOk].join(' ')}>CPF disponível</span>}
+                    {showErrors && form.cpf && !cpfCompleto && cpfStatus !== 'invalid' &&
+                      <span className={[styles.fieldMsg, styles.msgErr].join(' ')}>CPF incompleto</span>}
                   </div>
                   <div className={styles.field}>
                     <label className={[lblErr('nome'), styles.req].join(' ')}>Nome completo</label>
@@ -517,8 +544,12 @@ export default function ClienteRegistroPage() {
                 <div className={styles.grid2} style={{ marginBottom: 16 }}>
                   <div className={styles.field}>
                     <label className={[lblErr('telefone'), styles.req].join(' ')}>Telefone</label>
-                    <input className={errCls('telefone')} value={form.telefone}
+                    <input
+                      className={[styles.input, showErrors && (!form.telefone || !telefoneValido) ? styles.inputErr : ''].filter(Boolean).join(' ')}
+                      value={form.telefone}
                       onChange={e => set('telefone', maskPhone(e.target.value))} placeholder="(00) 00000-0000" inputMode="tel" />
+                    {showErrors && form.telefone && !telefoneValido &&
+                      <span className={[styles.fieldMsg, styles.msgErr].join(' ')}>Telefone incompleto</span>}
                   </div>
                   <div className={styles.field}>
                     <label className={[lblErr('sexo'), styles.req].join(' ')}>Sexo</label>
@@ -531,8 +562,12 @@ export default function ClienteRegistroPage() {
                 <div className={styles.grid2} style={{ marginBottom: 16 }}>
                   <div className={styles.field}>
                     <label className={styles.label}>Email</label>
-                    <input className={styles.input} type="email" value={form.email}
+                    <input
+                      className={[styles.input, showErrors && !emailValido ? styles.inputErr : ''].filter(Boolean).join(' ')}
+                      type="email" value={form.email}
                       onChange={e => set('email', e.target.value)} placeholder="email@exemplo.com" />
+                    {showErrors && !emailValido &&
+                      <span className={[styles.fieldMsg, styles.msgErr].join(' ')}>E-mail inválido</span>}
                   </div>
                   <div className={styles.field}>
                     <label className={styles.label}>Profissão</label>
@@ -626,7 +661,7 @@ export default function ClienteRegistroPage() {
                 )}
 
                 {form.veiculos.map((v, i) => {
-                  const placaErr = showVeicErrors && !v.placa;
+                  const placaErr = showVeicErrors && !validarPlaca(v.placa);
                   const marcas = MARCAS_POR_TIPO[v.tipo] ?? [];
                   return (
                     <div key={i} className={styles.vehCard}>
@@ -662,6 +697,8 @@ export default function ClienteRegistroPage() {
                           <input className={[styles.input, placaErr ? styles.inputErr : ''].join(' ')} value={v.placa}
                             onChange={e => setVeiculo(i,'placa',maskPlaca(e.target.value))}
                             placeholder="AAA0A00" maxLength={7} />
+                          {showVeicErrors && v.placa && !validarPlaca(v.placa) &&
+                            <span className={[styles.fieldMsg, styles.msgErr].join(' ')}>Placa inválida</span>}
                         </div>
                         <div className={styles.field}>
                           <label className={styles.label}>Cor</label>
