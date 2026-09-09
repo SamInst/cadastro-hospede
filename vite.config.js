@@ -15,7 +15,7 @@ const CSP = [
   'font-src https://fonts.gstatic.com',
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "script-src 'self'",
-  `connect-src 'self' ${API_BASE}`,
+  `connect-src 'self' ${API_BASE} https://viacep.com.br`,
   "form-action 'self'",
 ].join('; ')
 
