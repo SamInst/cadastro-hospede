@@ -485,7 +485,7 @@ export default function ClienteRegistroPage() {
                   </div>
                 )}
 
-                <SectionTitle icon={<User size={14} />} label="Identificação" />
+                {/*<SectionTitle icon={<User size={14} />} label="Identificação" />*/}
 
                 <div className={styles.gridCpf} style={{ marginBottom: 16 }}>
                   <div className={styles.field}>
