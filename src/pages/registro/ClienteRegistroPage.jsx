@@ -24,6 +24,9 @@ import styles          from './ClienteRegistroPage.module.css';
 // produção ao publicar). Sem variável, cai para o backend local.
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080';
 
+// Consulta de CEP: API pública ViaCEP, independente do backend.
+const VIACEP_URL = 'https://viacep.com.br/ws';
+
 // ── Listas ────────────────────────────────────────────────────────────────────
 const TIPOS_VEICULO = [
   'Carro','Moto','Pickup','SUV','Van','Caminhão','Ônibus','Microônibus','Quadriciclo','Trator',
@@ -45,19 +48,6 @@ const MARCAS_POR_TIPO = {
 const CORES_VEICULO = [
   'Branco','Preto','Prata','Cinza','Vermelho','Azul','Bege','Marrom','Verde',
   'Amarelo','Laranja','Vinho','Roxo','Dourado','Rosa',
-];
-
-const SEXO_OPTS = [
-  { value: '',  label: 'Selecione' },
-  { value: '1', label: 'Masculino' },
-  { value: '2', label: 'Feminino'  },
-  { value: '3', label: 'Outro'     },
-];
-
-const STEPS = [
-  { label: 'Dados',       n: 1 },
-  { label: 'Veículos',    n: 2 },
-  { label: 'Confirmação', n: 3 },
 ];
 
 const WA_NUMBER = import.meta.env.VITE_WHATSAPP_NUMBER;
@@ -121,9 +111,9 @@ const toApiDate = d => {
 const blankVeiculo = () => ({ tipo:'', modelo:'', marca:'', placa:'', cor:'' });
 const blankForm    = () => ({
   pessoaId: null,
-  nome:'', dataNascimento: null, cpf:'', email:'', profissao:'',
-  telefone:'', sexo:'', pais:'Brasil', estado:'', municipio:'',
-  endereco:'', complemento:'', cep:'', bairro:'', numero:'',
+  nome:'', dataNascimento: null, cpf:'', email:'',
+  telefone:'', pais:'Brasil', estado:'', municipio:'',
+  endereco:'', cep:'',
   veiculos: [], status: 'ATIVO',
 });
 
@@ -198,12 +188,11 @@ function SectionTitle({ icon, label }) {
 }
 
 // ── Step intro ──────────────────────────────────────────────────────────────────
-function StepHead({ kicker, title, desc }) {
+function StepHead({ kicker, title }) {
   return (
     <div className={styles.stepHead}>
       <div className={styles.stepKicker}>{kicker}</div>
       <h2 className={styles.stepTitle}>{title}</h2>
-      {desc && <p className={styles.stepDesc}>{desc}</p>}
     </div>
   );
 }
@@ -263,17 +252,12 @@ export default function ClienteRegistroPage() {
             dataNascimento: parseApiDate(rawNasc),
             cpf:            masked,
             email:          found.email ?? '',
-            profissao:      found.profissao ?? '',
             telefone:       maskPhone(found.telefone ?? ''),
-            sexo:           String(found.sexo ?? ''),
             pais:           found.pais ?? 'Brasil',
             estado:         found.estado ?? '',
             municipio:      found.municipio ?? '',
             endereco:       found.endereco ?? '',
-            complemento:    found.complemento ?? '',
             cep:            maskCEP(found.cep ?? ''),
-            bairro:         found.bairro ?? '',
-            numero:         found.numero ?? '',
             status:         found.status ?? 'ATIVO',
             veiculos: (found.veiculos_vinculados ?? []).map(v => ({
               id:     v.id,
@@ -307,23 +291,44 @@ export default function ClienteRegistroPage() {
   const handleCEP = async v => {
     const masked = maskCEP(v);
     set('cep', masked);
-    if (unmask(masked).length === 8) {
-      setCepLoading(true);
-      try {
-        const res = await fetch(`${BASE_URL}/cep/${unmask(masked)}`);
-        if (res.ok) {
-          const d = await res.json();
-          setForm(p => ({
-            ...p,
-            cep:       masked,
-            endereco:  d.endereco   || p.endereco,
-            bairro:    d.bairro     || p.bairro,
-            pais:      d.pais       || p.pais,
-            estado:    d.estado     || p.estado,
-            municipio: d.municipio  || p.municipio,
-          }));
-        }
-      } finally { setCepLoading(false); }
+    if (unmask(masked).length !== 8) return;
+
+    setCepLoading(true);
+    try {
+      const res = await fetch(`${VIACEP_URL}/${unmask(masked)}/json/`);
+
+      if (!res.ok) {
+        showNotif('Não foi possível consultar o CEP. Preencha o endereço manualmente.', 'error');
+        return;
+      }
+
+      const d = await res.json();
+
+      // CEP inexistente: o ViaCEP responde 200 com { erro: "true" }.
+      if (d.erro) {
+        showNotif('CEP não encontrado. Confira os dígitos.', 'error');
+        return;
+      }
+
+      // Uma única linha de endereço: "Rua Tal - Bairro".
+      const linha = [d.logradouro, d.bairro].filter(Boolean).join(' - ');
+
+      setForm(p => ({
+        ...p,
+        cep:       masked,
+        endereco:  linha        || p.endereco,
+        pais:      'Brasil',
+        estado:    d.estado     || d.uf || p.estado,
+        municipio: d.localidade || p.municipio,
+      }));
+
+      // CEP geral de cidade: vem sem logradouro/bairro.
+      if (!linha) showNotif('CEP localizado. Informe a rua e o número.', 'info');
+    } catch {
+      // Rede fora do ar, CORS ou CSP bloqueando a chamada.
+      showNotif('Não foi possível consultar o CEP. Verifique sua conexão.', 'error');
+    } finally {
+      setCepLoading(false);
     }
   };
 
@@ -336,13 +341,15 @@ export default function ClienteRegistroPage() {
   // ── Validação step 1 ────────────────────────────────────────────────────────
   const required1 = { cpf: form.cpf, nome: form.nome, dataNascimento: form.dataNascimento,
                       telefone: form.telefone, cep: form.cep,
-                      sexo: form.sexo, endereco: form.endereco };
+                      endereco: form.endereco };
   const missingField = f => !required1[f];
 
   // Validações de formato/completude
   const cpfCompleto    = validarCPF(unmask(form.cpf));                       // 11 dígitos + dígitos verificadores
   const telefoneValido = [10, 11].includes(unmask(form.telefone).length);   // (xx) xxxx-xxxx ou (xx) 9 xxxx-xxxx
   const emailValido    = !form.email.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim());
+  // Demais campos de endereco so aparecem depois do CEP completo.
+  const cepCompleto    = unmask(form.cep).length === 8;
 
   const goNext = () => {
     setShowErrors(true);
@@ -380,17 +387,12 @@ export default function ClienteRegistroPage() {
         data_nascimento: toApiDate(form.dataNascimento),
         cpf:             unmask(form.cpf),
         email:           form.email.trim() || null,
-        profissao:       up(form.profissao),
         telefone:        unmask(form.telefone),
         pais:            up(form.pais) || 'BRASIL',
         estado:          up(form.estado),
         municipio:       up(form.municipio),
         endereco:        up(form.endereco),
-        complemento:     up(form.complemento),
         cep:             unmask(form.cep),
-        bairro:          up(form.bairro),
-        sexo:            Number(form.sexo) || 1,
-        numero:          up(form.numero),
         veiculos: form.veiculos.map(v => ({
           ...(v.id ? { id: v.id } : {}),
           modelo: up(v.modelo),
@@ -426,8 +428,6 @@ export default function ClienteRegistroPage() {
       }
 
       setStep('done');
-      const waMsg = encodeURIComponent(`${up(form.nome)}\nOlá, fiz meu cadastro no site.`);
-      window.open(`https://wa.me/${WA_NUMBER}?text=${waMsg}`, '_blank');
     } catch(e) {
       showNotif(e.message || 'Erro ao salvar.', 'error');
     } finally {
@@ -459,7 +459,6 @@ export default function ClienteRegistroPage() {
 
       {/* ── Masthead ── */}
       <header className={styles.masthead}>
-        <div className={styles.brandMark}>IÉ</div>
         <p className={styles.eyebrow}>Cadastro de Hóspede</p>
         <h1 className={styles.title}>Isto É <em>Pousada</em></h1>
         <p className={styles.place}>Viana · Maranhão</p>
@@ -469,22 +468,6 @@ export default function ClienteRegistroPage() {
         </p>
       </header>
 
-      {/* ── Stepper ── */}
-      {step !== 'done' && (
-        <div className={styles.steps}>
-          {STEPS.map((s) => {
-            const active = step === s.n;
-            const done   = typeof step === 'number' && step > s.n;
-            return (
-              <div key={s.n} className={[styles.step, active ? styles.stepActive : '', done ? styles.stepDone : ''].filter(Boolean).join(' ')}>
-                <span className={styles.stepNode}>{done ? <Check size={16} /> : s.n}</span>
-                <span className={styles.stepLabel}>{s.label}</span>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
       {/* ── Card ── */}
       <div className={styles.card}>
 
@@ -492,12 +475,11 @@ export default function ClienteRegistroPage() {
         {step === 1 && (
           <>
             <div className={styles.body}>
-              <StepHead kicker="Etapa 1 de 3" title="Seus dados pessoais"
-                desc="Comece pelo CPF — se já tiver cadastro, preenchemos o restante." />
+              <StepHead kicker="Etapa 1 de 3" title="Seus dados pessoais" />
 
               <div className={styles.stagger}>
                 {isEdit && (
-                  <div className={styles.note}>
+                  <div className={[styles.note, styles.noteOk].join(' ')}>
                     <AlertTriangle size={18} />
                     <span><strong>Cadastro encontrado.</strong> Confira e atualize o que for necessário antes de confirmar.</span>
                   </div>
@@ -549,15 +531,6 @@ export default function ClienteRegistroPage() {
                       <span className={[styles.fieldMsg, styles.msgErr].join(' ')}>Telefone incompleto</span>}
                   </div>
                   <div className={styles.field}>
-                    <label className={[lblErr('sexo'), styles.req].join(' ')}>Sexo</label>
-                    <select className={styles.input} value={form.sexo} onChange={e => set('sexo', e.target.value)}>
-                      {SEXO_OPTS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                    </select>
-                  </div>
-                </div>
-
-                <div className={styles.grid2} style={{ marginBottom: 16 }}>
-                  <div className={styles.field}>
                     <label className={styles.label}>Email</label>
                     <input
                       className={[styles.input, showErrors && !emailValido ? styles.inputErr : ''].filter(Boolean).join(' ')}
@@ -566,16 +539,11 @@ export default function ClienteRegistroPage() {
                     {showErrors && !emailValido &&
                       <span className={[styles.fieldMsg, styles.msgErr].join(' ')}>E-mail inválido</span>}
                   </div>
-                  <div className={styles.field}>
-                    <label className={styles.label}>Profissão</label>
-                    <input className={styles.input} value={form.profissao}
-                      onChange={e => set('profissao', e.target.value)} placeholder="Ex: Engenheiro" />
-                  </div>
                 </div>
 
                 <SectionTitle icon={<MapPin size={14} />} label="Endereço" />
 
-                <div className={styles.grid3} style={{ marginBottom: 16 }}>
+                <div className={styles.grid2} style={{ marginBottom: 16 }}>
                   <div className={styles.field}>
                     <label className={[lblErr('cep'), styles.req].join(' ')}>CEP</label>
                     <div className={styles.inputWrap}>
@@ -584,46 +552,33 @@ export default function ClienteRegistroPage() {
                       {cepLoading && <span className={styles.inputSuffix}><Loader2 size={14} className={styles.spin} /></span>}
                     </div>
                   </div>
-                  <div className={styles.field}>
-                    <label className={styles.label}>País</label>
-                    <input className={styles.input} value={form.pais} onChange={e => set('pais', e.target.value)} />
-                  </div>
-                  <div className={styles.field}>
-                    <label className={styles.label}>Estado</label>
-                    <input className={styles.input} value={form.estado}
-                      onChange={e => set('estado', e.target.value)} placeholder="UF" />
-                  </div>
                 </div>
 
-                <div className={styles.grid2} style={{ marginBottom: 16 }}>
-                  <div className={styles.field}>
-                    <label className={styles.label}>Município</label>
-                    <input className={styles.input} value={form.municipio} onChange={e => set('municipio', e.target.value)} />
-                  </div>
-                  <div className={styles.field}>
-                    <label className={styles.label}>Bairro</label>
-                    <input className={styles.input} value={form.bairro} onChange={e => set('bairro', e.target.value)} />
-                  </div>
-                </div>
+                {cepCompleto && (
+                  <div className={styles.reveal}>
+                    <div className={styles.grid3} style={{ marginBottom: 16 }}>
+                      <div className={styles.field}>
+                        <label className={styles.label}>País</label>
+                        <input className={styles.input} value={form.pais} onChange={e => set('pais', e.target.value)} />
+                      </div>
+                      <div className={styles.field}>
+                        <label className={styles.label}>Estado</label>
+                        <input className={styles.input} value={form.estado}
+                          onChange={e => set('estado', e.target.value)} placeholder="Estado" />
+                      </div>
+                      <div className={styles.field}>
+                        <label className={styles.label}>Município</label>
+                        <input className={styles.input} value={form.municipio} onChange={e => set('municipio', e.target.value)} />
+                      </div>
+                    </div>
 
-                <div className={styles.grid3} style={{ marginBottom: 16 }}>
-                  <div className={[styles.field, styles.span2].join(' ')}>
-                    <label className={[lblErr('endereco'), styles.req].join(' ')}>Endereço</label>
-                    <input className={errCls('endereco')} value={form.endereco}
-                      onChange={e => set('endereco', e.target.value)} placeholder="Rua / Av." />
+                    <div className={styles.field}>
+                      <label className={[lblErr('endereco'), styles.req].join(' ')}>Endereço</label>
+                      <input className={errCls('endereco')} value={form.endereco}
+                        onChange={e => set('endereco', e.target.value)} placeholder="Rua, número, complemento" />
+                    </div>
                   </div>
-                  <div className={styles.field}>
-                    <label className={styles.label}>Número</label>
-                    <input className={styles.input} value={form.numero}
-                      onChange={e => set('numero', e.target.value)} placeholder="0" inputMode="numeric" />
-                  </div>
-                </div>
-
-                <div className={styles.field}>
-                  <label className={styles.label}>Complemento</label>
-                  <input className={styles.input} value={form.complemento}
-                    onChange={e => set('complemento', e.target.value)} placeholder="Apto, Bloco..." />
-                </div>
+                )}
               </div>
             </div>
 
@@ -639,17 +594,14 @@ export default function ClienteRegistroPage() {
         {step === 2 && (
           <>
             <div className={styles.body}>
-              <StepHead kicker="Etapa 2 de 3" title="Veículos"
-                desc="Opcional — registre veículos que ficarão na pousada." />
+              <div className={styles.headRow}>
+                <StepHead kicker="Etapa 2 de 3" title="Veículos" />
+                <button className={[styles.btn, styles.btnSm].join(' ')} onClick={addVeiculo}>
+                  <Plus size={13} /> Adicionar
+                </button>
+              </div>
 
               <div className={styles.stagger}>
-                <div className={styles.secRow}>
-                  <SectionTitle icon={<Car size={14} />} label={`Veículos${form.veiculos.length ? ` (${form.veiculos.length})` : ''}`} />
-                  <button className={[styles.btn, styles.btnSm].join(' ')} onClick={addVeiculo}>
-                    <Plus size={13} /> Adicionar
-                  </button>
-                </div>
-
                 {form.veiculos.length === 0 && (
                   <div className={styles.emptyVeh}>
                     <Car size={30} style={{ opacity: 0.4, color: 'var(--accent)' }} />
@@ -712,7 +664,7 @@ export default function ClienteRegistroPage() {
             <div className={styles.footer}>
               <button className={[styles.btn, styles.btnGhost].join(' ')} onClick={goBack}><ChevronLeft size={15} /> Voltar</button>
               <button className={[styles.btn, styles.btnPrimary].join(' ')} onClick={goToStep3}>
-                Continuar <ChevronRight size={15} />
+                {form.veiculos.length === 0 ? 'Pular etapa' : 'Continuar'} <ChevronRight size={15} />
               </button>
             </div>
           </>
@@ -722,19 +674,18 @@ export default function ClienteRegistroPage() {
         {step === 3 && (
           <>
             <div className={styles.body}>
-              <StepHead kicker="Etapa 3 de 3" title="Confirme seus dados"
-                desc={isEdit ? 'Seus dados serão atualizados com as informações abaixo.' : 'Revise antes de finalizar o cadastro.'} />
+              <StepHead kicker="Etapa 3 de 3" title="Confirme seus dados" />
 
               <div className={styles.stagger}>
                 <div className={styles.confirmCard}>
-                  <div className={styles.confirmAvatar}>{(form.nome || '?')[0].toUpperCase()}</div>
                   <div className={styles.confirmInfo}>
                     <div className={styles.confirmName}>{up(form.nome) || '—'}</div>
-                    <div className={styles.confirmMeta}>
-                      CPF: {form.cpf}
-                      {form.dataNascimento && ` · Nasc: ${form.dataNascimento.toLocaleDateString('pt-BR')}`}
-                    </div>
-                    <div className={styles.confirmMeta}>{[form.telefone, form.email].filter(Boolean).join(' · ')}</div>
+                    <div className={styles.confirmMeta}>CPF: {form.cpf || '—'}</div>
+                    {form.dataNascimento && (
+                      <div className={styles.confirmMeta}>Nascimento: {form.dataNascimento.toLocaleDateString('pt-BR')}</div>
+                    )}
+                    {form.telefone && <div className={styles.confirmMeta}>Telefone: {form.telefone}</div>}
+                    {form.email && <div className={styles.confirmMeta}>Email: {form.email}</div>}
                     {form.cep && <div className={styles.confirmMeta}>{form.cep} — {[form.municipio, form.estado].filter(Boolean).join(', ')}</div>}
                   </div>
                   {isEdit && <span className={styles.editBadge}>Atualização</span>}
@@ -743,15 +694,17 @@ export default function ClienteRegistroPage() {
                 {form.veiculos.length > 0 && (
                   <>
                     <p className={styles.confirmSub}>Veículos</p>
-                    {form.veiculos.map((v, i) => (
-                      <div key={i} className={styles.confirmCard}>
-                        <div className={styles.confirmAvatar}><Car size={20} /></div>
-                        <div className={styles.confirmInfo}>
-                          <div className={styles.confirmName}>{up(v.placa) || '—'} · {[up(v.modelo), up(v.marca)].filter(Boolean).join(' ') || '—'}</div>
-                          <div className={styles.confirmMeta}>{[up(v.tipo), up(v.cor)].filter(Boolean).join(' · ') || '—'}</div>
+                    {form.veiculos.map((v, i) => {
+                      const nome = [up(v.marca), up(v.modelo)].filter(Boolean).join(' ');
+                      return (
+                        <div key={i} className={styles.confirmCard}>
+                          <div className={styles.confirmInfo}>
+                            <div className={styles.confirmName}>{[nome, up(v.placa)].filter(Boolean).join(' · ') || '—'}</div>
+                            <div className={styles.confirmMeta}>{up(v.cor) || '—'}</div>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </>
                 )}
               </div>
@@ -810,17 +763,10 @@ export default function ClienteRegistroPage() {
 
       {/* ── Colophon ── */}
       <footer className={styles.colophon}>
-        <div className={styles.ornament}>✦</div>
-        <div className={styles.cphBrand}>Isto É Pousada</div>
-        <div className={styles.cphLinks}>
-          <a className={styles.cphPhone} href={`https://wa.me/${WA_NUMBER}`} target="_blank" rel="noopener noreferrer">
-            <WaIcon size={13} /> (98) 98855-5038
-          </a>
-          <span className={styles.cphAddr}><PinIcon size={12} /> Rodovia MA014 KM38, N612 · Viana</span>
-        </div>
         <span className={styles.cphLgpd}>
           Seus dados são tratados conforme a LGPD (Lei nº 13.709/2018) e usados apenas para a sua hospedagem.
         </span>
+        <span className={styles.cphAddr}><PinIcon size={12} /> Rodovia MA014 KM38, N612 · Viana</span>
       </footer>
 
       <Notif notif={notif} />
