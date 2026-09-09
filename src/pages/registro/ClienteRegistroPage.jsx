@@ -428,8 +428,6 @@ export default function ClienteRegistroPage() {
       }
 
       setStep('done');
-      const waMsg = encodeURIComponent(`${up(form.nome)}\nOlá, fiz meu cadastro no site.`);
-      window.open(`https://wa.me/${WA_NUMBER}?text=${waMsg}`, '_blank');
     } catch(e) {
       showNotif(e.message || 'Erro ao salvar.', 'error');
     } finally {
