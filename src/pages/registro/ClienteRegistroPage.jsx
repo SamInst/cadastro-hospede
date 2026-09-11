@@ -214,6 +214,8 @@ export default function ClienteRegistroPage() {
 
   // CEP
   const [cepLoading, setCepLoading] = useState(false);
+  // Hospede sem o CEP em maos: dispensa a consulta e abre so o endereco.
+  const [semCep, setSemCep] = useState(false);
 
   const set = (field, val) => setForm(p => ({ ...p, [field]: val }));
 
@@ -332,6 +334,12 @@ export default function ClienteRegistroPage() {
     }
   };
 
+  const toggleSemCep = marcado => {
+    setSemCep(marcado);
+    // Sem CEP nao ha localidade confiavel: zera o que a consulta preencheu.
+    setForm(p => ({ ...p, cep: '', estado: '', municipio: '', pais: 'Brasil' }));
+  };
+
   // ── Veículos ────────────────────────────────────────────────────────────────
   const addVeiculo    = () => setForm(p => ({ ...p, veiculos: [...p.veiculos, blankVeiculo()] }));
   const removeVeiculo = i  => setForm(p => ({ ...p, veiculos: p.veiculos.filter((_,j) => j !== i) }));
@@ -340,9 +348,12 @@ export default function ClienteRegistroPage() {
 
   // ── Validação step 1 ────────────────────────────────────────────────────────
   const required1 = { cpf: form.cpf, nome: form.nome, dataNascimento: form.dataNascimento,
-                      telefone: form.telefone, cep: form.cep,
+                      telefone: form.telefone,
+                      // Com "nao sei meu CEP" marcado, o CEP deixa de ser exigido.
+                      ...(semCep ? {} : { cep: form.cep }),
                       endereco: form.endereco };
-  const missingField = f => !required1[f];
+  // `f in required1` evita marcar erro no CEP quando ele deixa de ser exigido.
+  const missingField = f => f in required1 && !required1[f];
 
   // Validações de formato/completude
   const cpfCompleto    = validarCPF(unmask(form.cpf));                       // 11 dígitos + dígitos verificadores
@@ -350,6 +361,11 @@ export default function ClienteRegistroPage() {
   const emailValido    = !form.email.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim());
   // Demais campos de endereco so aparecem depois do CEP completo.
   const cepCompleto    = unmask(form.cep).length === 8;
+  const mostrarEndereco = semCep || cepCompleto;
+  // Pais/estado/municipio viram uma linha so na tela; no payload seguem separados.
+  const temLocalidade  = !semCep && cepCompleto && Boolean(form.municipio || form.estado);
+  const localidade     = [[form.municipio, form.estado].filter(Boolean).join(', '), form.pais]
+    .filter(Boolean).join(' - ');
 
   const goNext = () => {
     setShowErrors(true);
@@ -392,7 +408,7 @@ export default function ClienteRegistroPage() {
         estado:          up(form.estado),
         municipio:       up(form.municipio),
         endereco:        up(form.endereco),
-        cep:             unmask(form.cep),
+        cep:             unmask(form.cep) || null,
         veiculos: form.veiculos.map(v => ({
           ...(v.id ? { id: v.id } : {}),
           modelo: up(v.modelo),
@@ -463,8 +479,7 @@ export default function ClienteRegistroPage() {
         <h1 className={styles.title}>Isto É <em>Pousada</em></h1>
         <p className={styles.place}>Viana · Maranhão</p>
         <p className={styles.welcome}>
-          Preencha seus dados para agilizar sua chegada. Já é nosso hóspede?
-          Informe o CPF e cuidamos do resto.
+          Preencha seus dados para agilizar seu checkin.
         </p>
       </header>
 
@@ -543,34 +558,29 @@ export default function ClienteRegistroPage() {
 
                 <SectionTitle icon={<MapPin size={14} />} label="Endereço" />
 
-                <div className={styles.grid2} style={{ marginBottom: 16 }}>
+                <div className={styles.cepRow} style={{ marginBottom: 16 }}>
                   <div className={styles.field}>
-                    <label className={[lblErr('cep'), styles.req].join(' ')}>CEP</label>
+                    <label className={[lblErr('cep'), semCep ? '' : styles.req].filter(Boolean).join(' ')}>CEP</label>
                     <div className={styles.inputWrap}>
-                      <input className={errCls('cep')} value={form.cep}
+                      <input className={errCls('cep')} value={form.cep} disabled={semCep}
                         onChange={e => handleCEP(e.target.value)} placeholder="00000-000" inputMode="numeric" />
                       {cepLoading && <span className={styles.inputSuffix}><Loader2 size={14} className={styles.spin} /></span>}
                     </div>
                   </div>
+                  <label className={styles.checkbox}>
+                    <input type="checkbox" checked={semCep} onChange={e => toggleSemCep(e.target.checked)} />
+                    <span>Não sei meu CEP</span>
+                  </label>
                 </div>
 
-                {cepCompleto && (
+                {mostrarEndereco && (
                   <div className={styles.reveal}>
-                    <div className={styles.grid3} style={{ marginBottom: 16 }}>
-                      <div className={styles.field}>
-                        <label className={styles.label}>País</label>
-                        <input className={styles.input} value={form.pais} onChange={e => set('pais', e.target.value)} />
+                    {temLocalidade && (
+                      <div className={styles.field} style={{ marginBottom: 16 }}>
+                        <label className={styles.label}>Localidade</label>
+                        <div className={styles.readonly}>{localidade}</div>
                       </div>
-                      <div className={styles.field}>
-                        <label className={styles.label}>Estado</label>
-                        <input className={styles.input} value={form.estado}
-                          onChange={e => set('estado', e.target.value)} placeholder="Estado" />
-                      </div>
-                      <div className={styles.field}>
-                        <label className={styles.label}>Município</label>
-                        <input className={styles.input} value={form.municipio} onChange={e => set('municipio', e.target.value)} />
-                      </div>
-                    </div>
+                    )}
 
                     <div className={styles.field}>
                       <label className={[lblErr('endereco'), styles.req].join(' ')}>Endereço</label>
@@ -766,7 +776,7 @@ export default function ClienteRegistroPage() {
         <span className={styles.cphLgpd}>
           Seus dados são tratados conforme a LGPD (Lei nº 13.709/2018) e usados apenas para a sua hospedagem.
         </span>
-        <span className={styles.cphAddr}><PinIcon size={12} /> Rodovia MA014 KM38, N612 · Viana</span>
+        <span className={styles.cphAddr}><PinIcon size={12} /> Rodovia MA014 KM38, Número 612</span>
       </footer>
 
       <Notif notif={notif} />

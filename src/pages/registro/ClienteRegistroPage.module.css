@@ -101,6 +101,27 @@
 
 /* Campos de endereco revelados apos o CEP. */
 .reveal { animation: rise .45s var(--ease) both; }
+
+/* Linha do CEP: campo + "nao sei meu CEP" alinhados pela base do input. */
+.cepRow { display: flex; align-items: flex-end; gap: 1rem; }
+.cepRow .field { flex: 0 1 220px; }
+.checkbox {
+  display: inline-flex; align-items: center; gap: .5rem; height: 46px; flex-shrink: 0;
+  font-size: .82rem; color: var(--ink-soft); cursor: pointer; user-select: none;
+}
+.checkbox input { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; margin: 0; }
+@media (max-width: 560px) {
+  .cepRow { flex-direction: column; align-items: stretch; gap: .5rem; }
+  .cepRow .field { flex: 1 1 auto; }
+  .checkbox { height: auto; }
+}
+
+/* Localidade vinda do CEP: exibicao, nao campo editavel. */
+.readonly {
+  display: flex; align-items: center; height: 46px; padding: 0 .85rem;
+  border: 1.5px solid var(--line); border-radius: var(--r-sm);
+  background: var(--surface-2); color: var(--ink-soft); font-size: 15px;
+}
 .hint { font-size: .86rem; color: var(--muted); margin: 0 0 1rem; line-height: 1.5; }
 
 /* ── Grids / fields ─────────────────────────────────────── */
@@ -135,6 +156,9 @@ select.input {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' fill='none' stroke='%238C7F6D' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3 5l4 4 4-4'/%3E%3C/svg%3E");
   background-repeat: no-repeat; background-position: right .85rem center;
 }
+
+.input:disabled { background: var(--surface-2); color: var(--muted); cursor: not-allowed; }
+.input:disabled:hover { border-color: var(--line); }
 
 .inputErr { border-color: var(--err) !important; }
 .inputErr:focus { box-shadow: 0 0 0 4px var(--err-soft) !important; }
