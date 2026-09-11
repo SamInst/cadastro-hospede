@@ -12,8 +12,7 @@
 import { useState, useRef, useCallback } from 'react';
 import {
   User, MapPin, Car, CheckCircle2, AlertTriangle,
-  XCircle, Loader2, ChevronLeft, ChevronRight,
-  Plus, X, Check,
+  XCircle, Loader2, Plus, X, Check,
 } from 'lucide-react';
 
 import { DatePicker }  from '../../components/ui/DatePicker';
@@ -51,6 +50,13 @@ const CORES_VEICULO = [
 ];
 
 const WA_NUMBER = import.meta.env.VITE_WHATSAPP_NUMBER;
+
+// ── Identificação do controlador dos dados (LGPD, art. 9º) ───────────────────
+const EMPRESA = {
+  razaoSocial: 'ISTO E POUSADA',
+  cnpj:        '07.147.850/0001-66',
+  endereco:    'Rodovia MA014 KM38, Número 612',
+};
 
 // ── Utils ─────────────────────────────────────────────────────────────────────
 const maskCPF   = v => v.replace(/\D/g,'').slice(0,11)
@@ -114,7 +120,7 @@ const blankForm    = () => ({
   nome:'', dataNascimento: null, cpf:'', email:'',
   telefone:'', pais:'Brasil', estado:'', municipio:'',
   endereco:'', cep:'',
-  veiculos: [], status: 'ATIVO',
+  veiculos: [blankVeiculo()], status: 'ATIVO',
 });
 
 // ── WhatsApp / Pin glyphs ───────────────────────────────────────────────────────
@@ -187,23 +193,11 @@ function SectionTitle({ icon, label }) {
   return <div className={styles.secTitle}>{icon}<span>{label}</span></div>;
 }
 
-// ── Step intro ──────────────────────────────────────────────────────────────────
-function StepHead({ kicker, title }) {
-  return (
-    <div className={styles.stepHead}>
-      <div className={styles.stepKicker}>{kicker}</div>
-      <h2 className={styles.stepTitle}>{title}</h2>
-    </div>
-  );
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 export default function ClienteRegistroPage() {
-  const [step,        setStep]        = useState(1);   // 1 | 2 | 3 | 'done'
+  const [step,        setStep]        = useState('form'); // 'form' | 'done'
   const [form,        setForm]        = useState(blankForm());
   const [isEdit,      setIsEdit]      = useState(false); // true = atualização
-  const [showErrors,     setShowErrors]     = useState(false);
-  const [showVeicErrors, setShowVeicErrors] = useState(false);
   const [isSubmitting,setIsSubmitting]= useState(false);
   const [notif,       setNotif]       = useState(null);
   const notifTimer = useRef(null);
@@ -216,6 +210,10 @@ export default function ClienteRegistroPage() {
   const [cepLoading, setCepLoading] = useState(false);
   // Hospede sem o CEP em maos: dispensa a consulta e abre so o endereco.
   const [semCep, setSemCep] = useState(false);
+  // Hospede sem veiculo: dispensa a placa e mantem os campos fechados.
+  const [semVeiculo, setSemVeiculo] = useState(false);
+  // Consentimento LGPD: obrigatorio para enviar o cadastro.
+  const [aceiteTermos, setAceiteTermos] = useState(false);
 
   const set = (field, val) => setForm(p => ({ ...p, [field]: val }));
 
@@ -261,14 +259,17 @@ export default function ClienteRegistroPage() {
             endereco:       found.endereco ?? '',
             cep:            maskCEP(found.cep ?? ''),
             status:         found.status ?? 'ATIVO',
-            veiculos: (found.veiculos_vinculados ?? []).map(v => ({
-              id:     v.id,
-              modelo: v.modelo ?? '',
-              marca:  v.marca  ?? '',
-              ano:    String(v.ano ?? ''),
-              placa:  v.placa  ?? '',
-              cor:    v.cor    ?? '',
-            })),
+            // Sem veiculos vinculados, mantem uma linha em branco para a placa.
+            veiculos: (found.veiculos_vinculados ?? []).length
+              ? found.veiculos_vinculados.map(v => ({
+                  id:     v.id,
+                  modelo: v.modelo ?? '',
+                  marca:  v.marca  ?? '',
+                  ano:    String(v.ano ?? ''),
+                  placa:  v.placa  ?? '',
+                  cor:    v.cor    ?? '',
+                }))
+              : [blankVeiculo()],
           });
           setIsEdit(true);
           showNotif('Cadastro encontrado — campos preenchidos automaticamente.', 'info');
@@ -343,6 +344,12 @@ export default function ClienteRegistroPage() {
   // ── Veículos ────────────────────────────────────────────────────────────────
   const addVeiculo    = () => setForm(p => ({ ...p, veiculos: [...p.veiculos, blankVeiculo()] }));
   const removeVeiculo = i  => setForm(p => ({ ...p, veiculos: p.veiculos.filter((_,j) => j !== i) }));
+
+  const toggleSemVeiculo = marcado => {
+    setSemVeiculo(marcado);
+    // Descarta o que ja tinha sido digitado, deixando uma linha limpa.
+    setForm(p => ({ ...p, veiculos: [blankVeiculo()] }));
+  };
   const setVeiculo    = (i, field, val) =>
     setForm(p => ({ ...p, veiculos: p.veiculos.map((v,j) => j === i ? { ...v, [field]: val } : v) }));
 
@@ -352,8 +359,6 @@ export default function ClienteRegistroPage() {
                       // Com "nao sei meu CEP" marcado, o CEP deixa de ser exigido.
                       ...(semCep ? {} : { cep: form.cep }),
                       endereco: form.endereco };
-  // `f in required1` evita marcar erro no CEP quando ele deixa de ser exigido.
-  const missingField = f => f in required1 && !required1[f];
 
   // Validações de formato/completude
   const cpfCompleto    = validarCPF(unmask(form.cpf));                       // 11 dígitos + dígitos verificadores
@@ -367,33 +372,30 @@ export default function ClienteRegistroPage() {
   const localidade     = [[form.municipio, form.estado].filter(Boolean).join(', '), form.pais]
     .filter(Boolean).join(' - ');
 
-  const goNext = () => {
-    setShowErrors(true);
-    if (Object.values(required1).some(v => !v)) {
-      showNotif('Preencha todos os campos obrigatórios (*).', 'error'); return;
-    }
-    if (!cpfCompleto)    { showNotif('Informe um CPF válido (11 dígitos).', 'error'); return; }
-    if (!telefoneValido) { showNotif('Informe um telefone válido: (xx) xxxxx-xxxx.', 'error'); return; }
-    if (!emailValido)    { showNotif('Informe um e-mail válido (ex: nome@email.com).', 'error'); return; }
-    setShowErrors(false);
-    setStep(s => s + 1);
-  };
-  const goBack = () => setStep(s => s - 1);
+  // Veículo: ou o hóspede declara não ter, ou informa ao menos uma placa válida.
+  const veiculosOk = semVeiculo ||
+    (form.veiculos.some(v => v.placa) && form.veiculos.every(v => !v.placa || validarPlaca(v.placa)));
 
-  const goToStep3 = () => {
-    setShowVeicErrors(true);
-    if (form.veiculos.some(v => !v.placa)) {
-      showNotif('Informe a placa de todos os veículos (*).', 'error'); return;
-    }
-    if (form.veiculos.some(v => !validarPlaca(v.placa))) {
-      showNotif('Informe uma placa válida: AAA0A00 ou AAA0000.', 'error'); return;
-    }
-    setShowVeicErrors(false);
-    setStep(3);
-  };
+  // O botão de envio só libera quando tudo isto está satisfeito.
+  const formValido = Object.values(required1).every(Boolean) &&
+    cpfCompleto && telefoneValido && emailValido && veiculosOk && aceiteTermos;
+
+  // O que ainda falta, para o botão bloqueado não virar um beco sem saída.
+  const pendencias = [
+    !form.cpf || !cpfCompleto            ? 'CPF'                : null,
+    !form.nome                           ? 'nome'               : null,
+    !form.dataNascimento                 ? 'nascimento'         : null,
+    !form.telefone || !telefoneValido    ? 'telefone'           : null,
+    !emailValido                         ? 'e-mail válido'      : null,
+    !semCep && !form.cep                 ? 'CEP'                : null,
+    !form.endereco                       ? 'endereço'           : null,
+    !veiculosOk                          ? 'placa do veículo'   : null,
+    !aceiteTermos                        ? 'aceite dos termos'  : null,
+  ].filter(Boolean);
 
   // ── Submit ───────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
+    if (!formValido) return;
     setIsSubmitting(true);
     try {
       // Apenas campos que o próprio hóspede pode informar. status / titular /
@@ -409,7 +411,8 @@ export default function ClienteRegistroPage() {
         municipio:       up(form.municipio),
         endereco:        up(form.endereco),
         cep:             unmask(form.cep) || null,
-        veiculos: form.veiculos.map(v => ({
+        // Linhas sem placa sao rascunho de UI e nao vao para a API.
+        veiculos: (semVeiculo ? [] : form.veiculos.filter(v => v.placa)).map(v => ({
           ...(v.id ? { id: v.id } : {}),
           modelo: up(v.modelo),
           marca:  up(v.marca),
@@ -463,11 +466,13 @@ export default function ClienteRegistroPage() {
     cpfStatus === 'ok'           ? styles.inputOk   : '',
     cpfStatus === 'exists'       ? styles.inputInfo : '',
     cpfStatus === 'invalid'      ? styles.inputErr  : '',
-    showErrors && !cpfCompleto   ? styles.inputErr  : '',
+    form.cpf && !cpfCompleto     ? styles.inputErr  : '',
   ].filter(Boolean).join(' ');
 
-  const errCls = f => [styles.input, showErrors && missingField(f) ? styles.inputErr : ''].filter(Boolean).join(' ');
-  const lblErr = f => [styles.label, showErrors && missingField(f) ? styles.labelErr : ''].filter(Boolean).join(' ');
+  // Campos vazios nao sao mais pintados de vermelho: quem sinaliza o que falta
+  // e a lista de pendencias ao lado do botao bloqueado.
+  const errCls = () => styles.input;
+  const lblErr = () => styles.label;
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
@@ -486,12 +491,10 @@ export default function ClienteRegistroPage() {
       {/* ── Card ── */}
       <div className={styles.card}>
 
-        {/* ══ STEP 1 ══════════════════════════════════════════════════════════ */}
-        {step === 1 && (
+        {/* ══ FORMULÁRIO ══════════════════════════════════════════════════════ */}
+        {step === 'form' && (
           <>
             <div className={styles.body}>
-              <StepHead kicker="Etapa 1 de 3" title="Seus dados pessoais" />
-
               <div className={styles.stagger}>
                 {isEdit && (
                   <div className={[styles.note, styles.noteOk].join(' ')}>
@@ -500,11 +503,11 @@ export default function ClienteRegistroPage() {
                   </div>
                 )}
 
-                {/*<SectionTitle icon={<User size={14} />} label="Identificação" />*/}
+                <SectionTitle icon={<User size={14} />} label="Identificação" />
 
                 <div className={styles.gridCpf} style={{ marginBottom: 16 }}>
                   <div className={styles.field}>
-                    <label className={[styles.label, styles.req, showErrors && !form.cpf ? styles.labelErr : ''].filter(Boolean).join(' ')}>CPF</label>
+                    <label className={[styles.label, styles.req].join(' ')}>CPF</label>
                     <div className={styles.inputWrap}>
                       <input className={cpfCls} value={form.cpf} onChange={e => handleCPF(e.target.value)}
                         placeholder="000.000.000-00" maxLength={14} autoComplete="off" inputMode="numeric" />
@@ -513,7 +516,7 @@ export default function ClienteRegistroPage() {
                     {cpfStatus === 'invalid' && <span className={[styles.fieldMsg, styles.msgErr].join(' ')}>CPF inválido</span>}
                     {cpfStatus === 'exists'  && <span className={[styles.fieldMsg, styles.msgInfo].join(' ')}>Cadastro encontrado</span>}
                     {cpfStatus === 'ok'      && <span className={[styles.fieldMsg, styles.msgOk].join(' ')}>CPF disponível</span>}
-                    {showErrors && form.cpf && !cpfCompleto && cpfStatus !== 'invalid' &&
+                    {form.cpf && !cpfCompleto && cpfStatus !== 'invalid' &&
                       <span className={[styles.fieldMsg, styles.msgErr].join(' ')}>CPF incompleto</span>}
                   </div>
                   <div className={styles.field}>
@@ -529,7 +532,6 @@ export default function ClienteRegistroPage() {
                       onChange={d => set('dataNascimento', d ?? null)}
                       maxDate={new Date()}
                       placeholder="dd/mm/aaaa"
-                      error={showErrors && !form.dataNascimento}
                       disablePopup
                     />
                   </div>
@@ -539,26 +541,26 @@ export default function ClienteRegistroPage() {
                   <div className={styles.field}>
                     <label className={[lblErr('telefone'), styles.req].join(' ')}>Telefone</label>
                     <input
-                      className={[styles.input, showErrors && (!form.telefone || !telefoneValido) ? styles.inputErr : ''].filter(Boolean).join(' ')}
+                      className={[styles.input, form.telefone && !telefoneValido ? styles.inputErr : ''].filter(Boolean).join(' ')}
                       value={form.telefone}
                       onChange={e => set('telefone', maskPhone(e.target.value))} placeholder="(00) 00000-0000" inputMode="tel" />
-                    {showErrors && form.telefone && !telefoneValido &&
+                    {form.telefone && !telefoneValido &&
                       <span className={[styles.fieldMsg, styles.msgErr].join(' ')}>Telefone incompleto</span>}
                   </div>
                   <div className={styles.field}>
                     <label className={styles.label}>Email</label>
                     <input
-                      className={[styles.input, showErrors && !emailValido ? styles.inputErr : ''].filter(Boolean).join(' ')}
+                      className={[styles.input, !emailValido ? styles.inputErr : ''].filter(Boolean).join(' ')}
                       type="email" value={form.email}
                       onChange={e => set('email', e.target.value)} placeholder="email@exemplo.com" />
-                    {showErrors && !emailValido &&
+                    {!emailValido &&
                       <span className={[styles.fieldMsg, styles.msgErr].join(' ')}>E-mail inválido</span>}
                   </div>
                 </div>
 
                 <SectionTitle icon={<MapPin size={14} />} label="Endereço" />
 
-                <div className={styles.cepRow} style={{ marginBottom: 16 }}>
+                <div className={styles.fieldRow} style={{ marginBottom: 16 }}>
                   <div className={styles.field}>
                     <label className={[lblErr('cep'), semCep ? '' : styles.req].filter(Boolean).join(' ')}>CEP</label>
                     <div className={styles.inputWrap}>
@@ -589,142 +591,98 @@ export default function ClienteRegistroPage() {
                     </div>
                   </div>
                 )}
-              </div>
-            </div>
 
-            <div className={styles.footer}>
-              <button className={[styles.btn, styles.btnPrimary].join(' ')} onClick={goNext}>
-                Continuar <ChevronRight size={15} />
-              </button>
-            </div>
-          </>
-        )}
-
-        {/* ══ STEP 2 ══════════════════════════════════════════════════════════ */}
-        {step === 2 && (
-          <>
-            <div className={styles.body}>
-              <div className={styles.headRow}>
-                <StepHead kicker="Etapa 2 de 3" title="Veículos" />
-                <button className={[styles.btn, styles.btnSm].join(' ')} onClick={addVeiculo}>
-                  <Plus size={13} /> Adicionar
-                </button>
-              </div>
-
-              <div className={styles.stagger}>
-                {form.veiculos.length === 0 && (
-                  <div className={styles.emptyVeh}>
-                    <Car size={30} style={{ opacity: 0.4, color: 'var(--accent)' }} />
-                    <span>Nenhum veículo adicionado</span>
-                  </div>
-                )}
+                <SectionTitle icon={<Car size={14} />} label="Veículo" />
 
                 {form.veiculos.map((v, i) => {
-                  const placaErr = showVeicErrors && !validarPlaca(v.placa);
-                  const marcas = MARCAS_POR_TIPO[v.tipo] ?? [];
+                  const marcas   = MARCAS_POR_TIPO[v.tipo] ?? [];
+                  const placaErr = !semVeiculo && Boolean(v.placa) && !validarPlaca(v.placa);
                   return (
-                    <div key={i} className={styles.vehCard}>
-                      <div className={styles.vehHead}>
-                        <Car size={15} />
-                        <span>Veículo {i + 1}</span>
-                        {v.placa && <span className={styles.placaBadge}>{v.placa}</span>}
-                        <button className={styles.btnRemove} onClick={() => removeVeiculo(i)}><X size={14} /></button>
-                      </div>
-                      <div className={styles.grid3} style={{ marginBottom: 12 }}>
+                    <div key={i}>
+                      <div className={styles.fieldRow} style={{ marginBottom: 16 }}>
                         <div className={styles.field}>
-                          <label className={styles.label}>Tipo</label>
-                          <select className={styles.input} value={v.tipo}
-                            onChange={e => { setVeiculo(i,'tipo',e.target.value); setVeiculo(i,'marca',''); }}>
-                            <option value="">Selecione</option>
-                            {TIPOS_VEICULO.map(t => <option key={t} value={t}>{t}</option>)}
-                          </select>
-                        </div>
-                        <div className={styles.field}>
-                          <label className={styles.label}>Modelo</label>
-                          <input className={styles.input} value={v.modelo}
-                            onChange={e => setVeiculo(i,'modelo',e.target.value)} placeholder="Ex: Civic" />
-                        </div>
-                        <div className={styles.field}>
-                          <label className={styles.label}>Marca</label>
-                          <Combobox value={v.marca} onChange={val => setVeiculo(i,'marca',val)}
-                            options={marcas} placeholder={v.tipo ? 'Selecione a marca' : 'Selecione o tipo antes'} />
-                        </div>
-                      </div>
-                      <div className={styles.grid2}>
-                        <div className={styles.field}>
-                          <label className={[styles.label, styles.req].join(' ')}>Placa</label>
-                          <input className={[styles.input, placaErr ? styles.inputErr : ''].join(' ')} value={v.placa}
-                            onChange={e => setVeiculo(i,'placa',maskPlaca(e.target.value))}
+                          <label className={[styles.label, semVeiculo ? '' : styles.req, placaErr ? styles.labelErr : ''].filter(Boolean).join(' ')}>
+                            {i === 0 ? 'Placa' : `Placa do veículo ${i + 1}`}
+                          </label>
+                          <input className={[styles.input, placaErr ? styles.inputErr : ''].filter(Boolean).join(' ')}
+                            value={v.placa} disabled={semVeiculo}
+                            onChange={e => setVeiculo(i, 'placa', maskPlaca(e.target.value))}
                             placeholder="AAA0A00" maxLength={7} />
-                          {showVeicErrors && v.placa && !validarPlaca(v.placa) &&
+                          {placaErr && v.placa &&
                             <span className={[styles.fieldMsg, styles.msgErr].join(' ')}>Placa inválida</span>}
                         </div>
-                        <div className={styles.field}>
-                          <label className={styles.label}>Cor</label>
-                          <Combobox value={v.cor} onChange={val => setVeiculo(i,'cor',val)}
-                            options={CORES_VEICULO} placeholder="Ex: Preto" />
-                        </div>
+                        {i === 0 ? (
+                          <label className={styles.checkbox}>
+                            <input type="checkbox" checked={semVeiculo} onChange={e => toggleSemVeiculo(e.target.checked)} />
+                            <span>Não possuo veículo</span>
+                          </label>
+                        ) : (
+                          <button className={styles.btnRemove} onClick={() => removeVeiculo(i)} aria-label="Remover veículo">
+                            <X size={14} />
+                          </button>
+                        )}
                       </div>
+
+                      {!semVeiculo && v.placa && (
+                        <div className={styles.reveal}>
+                          <div className={styles.grid3} style={{ marginBottom: 16 }}>
+                            <div className={styles.field}>
+                              <label className={styles.label}>Tipo</label>
+                              <select className={styles.input} value={v.tipo}
+                                onChange={e => { setVeiculo(i,'tipo',e.target.value); setVeiculo(i,'marca',''); }}>
+                                <option value="">Selecione</option>
+                                {TIPOS_VEICULO.map(t => <option key={t} value={t}>{t}</option>)}
+                              </select>
+                            </div>
+                            <div className={styles.field}>
+                              <label className={styles.label}>Modelo</label>
+                              <input className={styles.input} value={v.modelo}
+                                onChange={e => setVeiculo(i,'modelo',e.target.value)} placeholder="Ex: Civic" />
+                            </div>
+                            <div className={styles.field}>
+                              <label className={styles.label}>Marca</label>
+                              <Combobox value={v.marca} onChange={val => setVeiculo(i,'marca',val)}
+                                options={marcas} placeholder={v.tipo ? 'Selecione a marca' : 'Selecione o tipo antes'} />
+                            </div>
+                          </div>
+                          <div className={styles.grid2} style={{ marginBottom: 16 }}>
+                            <div className={styles.field}>
+                              <label className={styles.label}>Cor</label>
+                              <Combobox value={v.cor} onChange={val => setVeiculo(i,'cor',val)}
+                                options={CORES_VEICULO} placeholder="Ex: Preto" />
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
-              </div>
-            </div>
 
-            <div className={styles.footer}>
-              <button className={[styles.btn, styles.btnGhost].join(' ')} onClick={goBack}><ChevronLeft size={15} /> Voltar</button>
-              <button className={[styles.btn, styles.btnPrimary].join(' ')} onClick={goToStep3}>
-                {form.veiculos.length === 0 ? 'Pular etapa' : 'Continuar'} <ChevronRight size={15} />
-              </button>
-            </div>
-          </>
-        )}
-
-        {/* ══ STEP 3 ══════════════════════════════════════════════════════════ */}
-        {step === 3 && (
-          <>
-            <div className={styles.body}>
-              <StepHead kicker="Etapa 3 de 3" title="Confirme seus dados" />
-
-              <div className={styles.stagger}>
-                <div className={styles.confirmCard}>
-                  <div className={styles.confirmInfo}>
-                    <div className={styles.confirmName}>{up(form.nome) || '—'}</div>
-                    <div className={styles.confirmMeta}>CPF: {form.cpf || '—'}</div>
-                    {form.dataNascimento && (
-                      <div className={styles.confirmMeta}>Nascimento: {form.dataNascimento.toLocaleDateString('pt-BR')}</div>
-                    )}
-                    {form.telefone && <div className={styles.confirmMeta}>Telefone: {form.telefone}</div>}
-                    {form.email && <div className={styles.confirmMeta}>Email: {form.email}</div>}
-                    {form.cep && <div className={styles.confirmMeta}>{form.cep} — {[form.municipio, form.estado].filter(Boolean).join(', ')}</div>}
-                  </div>
-                  {isEdit && <span className={styles.editBadge}>Atualização</span>}
-                </div>
-
-                {form.veiculos.length > 0 && (
-                  <>
-                    <p className={styles.confirmSub}>Veículos</p>
-                    {form.veiculos.map((v, i) => {
-                      const nome = [up(v.marca), up(v.modelo)].filter(Boolean).join(' ');
-                      return (
-                        <div key={i} className={styles.confirmCard}>
-                          <div className={styles.confirmInfo}>
-                            <div className={styles.confirmName}>{[nome, up(v.placa)].filter(Boolean).join(' · ') || '—'}</div>
-                            <div className={styles.confirmMeta}>{up(v.cor) || '—'}</div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </>
+                {!semVeiculo && form.veiculos.every(v => v.placa) && (
+                  <button className={[styles.btn, styles.btnSm].join(' ')} onClick={addVeiculo}>
+                    <Plus size={13} /> Adicionar outro veículo
+                  </button>
                 )}
+
+                <label className={styles.consent}>
+                  <input type="checkbox" checked={aceiteTermos}
+                    onChange={e => setAceiteTermos(e.target.checked)} />
+                  <span>
+                    Li e aceito os <strong>Termos e Condições de Uso</strong> e autorizo o
+                    tratamento dos meus dados pessoais pela {EMPRESA.razaoSocial}, nos termos
+                    da LGPD (Lei nº 13.709/2018), para fins de hospedagem. Posso solicitar
+                    acesso, correção ou exclusão dos meus dados a qualquer momento.
+                  </span>
+                </label>
               </div>
             </div>
 
             <div className={styles.footer}>
-              <button className={[styles.btn, styles.btnGhost].join(' ')} onClick={goBack} disabled={isSubmitting}>
-                <ChevronLeft size={15} /> Voltar
-              </button>
-              <button className={[styles.btn, styles.btnPrimary].join(' ')} onClick={handleSubmit} disabled={isSubmitting}>
+              {pendencias.length > 0 && (
+                <span className={styles.pendencias}>Falta preencher: {pendencias.join(' · ')}</span>
+              )}
+              <button className={[styles.btn, styles.btnPrimary].join(' ')} onClick={handleSubmit}
+                disabled={isSubmitting || !formValido}>
                 {isSubmitting
                   ? <><Loader2 size={14} className={styles.spin} /> Salvando...</>
                   : isEdit ? <>Confirmar Atualização <Check size={15} /></> : <>Confirmar Cadastro <Check size={15} /></>
@@ -776,7 +734,11 @@ export default function ClienteRegistroPage() {
         <span className={styles.cphLgpd}>
           Seus dados são tratados conforme a LGPD (Lei nº 13.709/2018) e usados apenas para a sua hospedagem.
         </span>
-        <span className={styles.cphAddr}><PinIcon size={12} /> Rodovia MA014 KM38, Número 612</span>
+        <div className={styles.cphEmpresa}>
+          <strong>{EMPRESA.razaoSocial}</strong>
+          <span>CNPJ {EMPRESA.cnpj}</span>
+          <span className={styles.cphAddr}><PinIcon size={12} /> {EMPRESA.endereco}</span>
+        </div>
       </footer>
 
       <Notif notif={notif} />

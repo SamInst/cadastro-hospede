@@ -64,11 +64,6 @@
 .body { padding: 1.5rem 1.3rem .5rem; }
 @media (min-width: 540px) { .body { padding: 1.9rem 1.8rem .6rem; } }
 
-/* step intro inside card */
-.stepHead { margin-bottom: 1.4rem; }
-.stepKicker { font-size: .64rem; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--accent-deep); margin-bottom: .35rem; }
-@media (prefers-color-scheme: dark) { .stepKicker { color: var(--accent); } }
-.stepTitle { font-family: var(--serif); font-size: clamp(1.3rem, 5vw, 1.55rem); font-weight: 600; letter-spacing: -.01em; color: var(--ink); line-height: 1.1; }
 
 /* ── Section title ──────────────────────────────────────── */
 .secTitle {
@@ -79,11 +74,6 @@
 .secTitle:first-child { margin-top: 0; }
 .secTitle svg { color: var(--accent); }
 .secTitle::after { content: ''; flex: 1; height: 1px; background: linear-gradient(90deg, var(--line-strong), transparent); }
-/* Titulo da etapa com uma acao alinhada a direita. */
-.headRow { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; margin-bottom: 1.4rem; }
-.headRow .stepHead { margin-bottom: 0; }
-.headRow .btn { flex-shrink: 0; }
-
 /* ── Note banner ────────────────────────────────────────── */
 .note {
   display: flex; gap: .75rem; align-items: flex-start;
@@ -102,19 +92,32 @@
 /* Campos de endereco revelados apos o CEP. */
 .reveal { animation: rise .45s var(--ease) both; }
 
-/* Linha do CEP: campo + "nao sei meu CEP" alinhados pela base do input. */
-.cepRow { display: flex; align-items: flex-end; gap: 1rem; }
-.cepRow .field { flex: 0 1 220px; }
+/* Campo curto + checkbox na mesma linha, alinhados pela base do input. */
+.fieldRow { display: flex; align-items: flex-end; gap: 1rem; }
+.fieldRow .field { flex: 0 1 220px; }
 .checkbox {
   display: inline-flex; align-items: center; gap: .5rem; height: 46px; flex-shrink: 0;
   font-size: .82rem; color: var(--ink-soft); cursor: pointer; user-select: none;
 }
 .checkbox input { width: 17px; height: 17px; accent-color: var(--accent); cursor: pointer; margin: 0; }
 @media (max-width: 560px) {
-  .cepRow { flex-direction: column; align-items: stretch; gap: .5rem; }
-  .cepRow .field { flex: 1 1 auto; }
+  .fieldRow { flex-direction: column; align-items: stretch; gap: .5rem; }
+  .fieldRow .field { flex: 1 1 auto; }
   .checkbox { height: auto; }
 }
+
+/* Aceite dos termos: texto de varias linhas, marcador alinhado ao topo. */
+.consent {
+  display: flex; align-items: flex-start; gap: .6rem; margin-top: 1.6rem;
+  font-size: .82rem; line-height: 1.5; color: var(--ink-soft); cursor: pointer;
+}
+.consent input {
+  width: 17px; height: 17px; margin: .15rem 0 0; flex-shrink: 0;
+  accent-color: var(--accent); cursor: pointer;
+}
+.consent strong { color: var(--ink); font-weight: 700; }
+.consentErr, .consentErr strong { color: var(--err); }
+.consentErr input { outline: 2px solid var(--err); outline-offset: 2px; border-radius: 3px; }
 
 /* Localidade vinda do CEP: exibicao, nao campo editavel. */
 .readonly {
@@ -194,21 +197,6 @@ select.input {
 @media (prefers-color-scheme: dark) { .comboItem:hover { color: var(--accent); } }
 
 /* ── Veículos ───────────────────────────────────────────── */
-.emptyVeh {
-  display: flex; flex-direction: column; align-items: center; gap: .6rem; padding: 2.4rem 0;
-  color: var(--muted); font-size: .9rem; border: 1.5px dashed var(--line-strong); border-radius: var(--r);
-}
-.vehCard {
-  border: 1px solid var(--line); border-radius: var(--r); background: var(--surface-2);
-  padding: 1rem 1rem .9rem; margin-bottom: .85rem;
-  animation: rise .3s var(--ease) both;
-}
-.vehHead { display: flex; align-items: center; gap: .6rem; font-size: .88rem; font-weight: 600; color: var(--ink); margin-bottom: .9rem; }
-.vehHead svg { color: var(--accent); }
-.placaBadge {
-  font-family: var(--serif); font-style: italic; background: var(--accent); color: #fff;
-  font-size: .72rem; font-weight: 600; letter-spacing: .06em; padding: .12rem .6rem; border-radius: 7px;
-}
 .btnRemove {
   margin-left: auto; width: 30px; height: 30px; flex-shrink: 0; display: grid; place-items: center;
   border-radius: 9px; border: 1px solid var(--line); background: var(--surface); color: var(--err);
@@ -242,26 +230,13 @@ select.input {
 .footer { display: flex; align-items: center; justify-content: flex-end; gap: .7rem; padding: 1.1rem 1.3rem 1.4rem; border-top: 1px solid var(--line); }
 @media (min-width: 540px) { .footer { padding: 1.2rem 1.8rem 1.6rem; } }
 .footer .btnGhost { margin-right: auto; }
+.pendencias { margin-right: auto; font-size: .74rem; line-height: 1.45; color: var(--muted); text-align: left; max-width: 26ch; }
 @media (max-width: 420px) {
   .footer { flex-direction: column-reverse; }
   .footer .btn { width: 100%; }
   .footer .btnGhost { margin-right: 0; }
+  .pendencias { margin-right: 0; max-width: none; text-align: center; }
 }
-
-/* ── Confirmação ────────────────────────────────────────── */
-/* Sem moldura propria: o conteudo vive direto no card da etapa. */
-.confirmCard { position: relative; margin-bottom: 1.1rem; }
-.confirmInfo { min-width: 0; }
-.confirmName { font-weight: 600; font-size: .98rem; color: var(--ink); margin-bottom: .15rem; word-break: break-word; }
-.confirmMeta { font-size: .8rem; color: var(--muted); line-height: 1.55; word-break: break-word; }
-.confirmSub { font-size: .66rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent-deep); margin: 1.1rem 0 .6rem; }
-@media (prefers-color-scheme: dark) { .confirmSub { color: var(--accent); } }
-.editBadge {
-  position: absolute; top: 0; right: 0; font-size: .6rem; font-weight: 700; letter-spacing: .06em;
-  text-transform: uppercase; color: var(--accent-deep); background: var(--accent-soft);
-  border: 1px solid var(--line); padding: .2rem .55rem; border-radius: 6px; white-space: nowrap;
-}
-@media (prefers-color-scheme: dark) { .editBadge { color: var(--accent); } }
 
 /* ── Done ───────────────────────────────────────────────── */
 .done { text-align: center; padding: 3rem 1.6rem 2.6rem; }
@@ -288,7 +263,9 @@ select.input {
 /* ── Colophon ───────────────────────────────────────────── */
 .colophon { text-align: center; padding: 2.2rem 1.4rem .4rem; color: var(--muted); font-size: .76rem; line-height: 1.7; animation: rise .6s .3s both var(--ease); }
 .cphLgpd { display: block; max-width: 40ch; margin: 0 auto; opacity: .85; }
-.cphAddr { display: inline-flex; align-items: center; gap: .35rem; margin-top: .7rem; }
+.cphAddr { display: inline-flex; align-items: center; gap: .35rem; }
+.cphEmpresa { display: flex; flex-direction: column; align-items: center; gap: .15rem; margin-top: 1rem; }
+.cphEmpresa strong { color: var(--ink-soft); font-weight: 700; letter-spacing: .04em; }
 
 /* ── Notif / toast ──────────────────────────────────────── */
 .notif {
