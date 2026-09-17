@@ -678,9 +678,9 @@ export default function ClienteRegistroPage() {
             </div>
 
             <div className={styles.footer}>
-              {pendencias.length > 0 && (
-                <span className={styles.pendencias}>Falta preencher: {pendencias.join(' · ')}</span>
-              )}
+              {/*{pendencias.length > 0 && (*/}
+              {/*  <span className={styles.pendencias}>Falta preencher: {pendencias.join(' · ')}</span>*/}
+              {/*)}*/}
               <button className={[styles.btn, styles.btnPrimary].join(' ')} onClick={handleSubmit}
                 disabled={isSubmitting || !formValido}>
                 {isSubmitting
@@ -731,9 +731,9 @@ export default function ClienteRegistroPage() {
 
       {/* ── Colophon ── */}
       <footer className={styles.colophon}>
-        <span className={styles.cphLgpd}>
-          Seus dados são tratados conforme a LGPD (Lei nº 13.709/2018) e usados apenas para a sua hospedagem.
-        </span>
+        {/*<span className={styles.cphLgpd}>*/}
+        {/*  Seus dados são tratados conforme a LGPD (Lei nº 13.709/2018) e usados apenas para a sua hospedagem.*/}
+        {/*</span>*/}
         <div className={styles.cphEmpresa}>
           <strong>{EMPRESA.razaoSocial}</strong>
           <span>CNPJ {EMPRESA.cnpj}</span>
