@@ -49,6 +49,11 @@ const CORES_VEICULO = [
   'Amarelo','Laranja','Vinho','Roxo','Dourado','Rosa',
 ];
 
+const semAcento = v => (v ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').trim().toUpperCase();
+const tipoEnum  = t => semAcento(t).replace(/\s+/g, '') || null;
+const tipoLabel = e => TIPOS_VEICULO.find(t => tipoEnum(t) === semAcento(e)) ?? '';
+const codigoCor = c => { const i = CORES_VEICULO.findIndex(x => semAcento(x) === semAcento(c)); return i < 0 ? null : i + 1; };
+
 const WA_NUMBER = import.meta.env.VITE_WHATSAPP_NUMBER;
 
 // ── Identificação do controlador dos dados (LGPD, art. 9º) ───────────────────
@@ -263,6 +268,7 @@ export default function ClienteRegistroPage() {
             veiculos: (found.veiculos_vinculados ?? []).length
               ? found.veiculos_vinculados.map(v => ({
                   id:     v.id,
+                  tipo:   tipoLabel(v.tipo),
                   modelo: v.modelo ?? '',
                   marca:  v.marca  ?? '',
                   ano:    String(v.ano ?? ''),
@@ -414,10 +420,12 @@ export default function ClienteRegistroPage() {
         // Linhas sem placa sao rascunho de UI e nao vao para a API.
         veiculos: (semVeiculo ? [] : form.veiculos.filter(v => v.placa)).map(v => ({
           ...(v.id ? { id: v.id } : {}),
+          tipo:   tipoEnum(v.tipo),
           modelo: up(v.modelo),
           marca:  up(v.marca),
           placa:  cleanPlaca(v.placa),
           cor:    up(v.cor),
+          codigo_cor: codigoCor(v.cor),
         })),
       };
 
